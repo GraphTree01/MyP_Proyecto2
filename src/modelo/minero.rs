@@ -3,6 +3,7 @@ use std::path::{PathBuf, Path};
 
 use walkdir::WalkDir;
 
+use crate::modelo::metadatos::Metadatos;
 
 pub struct Minero {
     path: PathBuf,
@@ -17,8 +18,12 @@ impl Minero {
         }
     }
 
-    pub fn mina(&self) -> Result <(), Box<dyn Error>> {
+    pub fn mina<F>(&self, mut procesar: F) -> Result<(), Box<dyn Error>>
 
+    where
+        F: FnMut(Metadatos) -> Result<(), Box<dyn Error>>,
+        
+    {
         let buscador = WalkDir::new(&self.path).contents_first(true);
 
         for resultado in buscador {
@@ -40,9 +45,10 @@ impl Minero {
                 continue;
             }
 
+            let metadatos = Metadatos::nuevo(ruta)?;
+            procesar(metadatos)?;
         }
 
         Ok(())
     }
-
 }

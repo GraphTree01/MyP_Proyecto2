@@ -1,10 +1,9 @@
 use std::error::Error;
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 
 use id3::{Tag, TagLike};
 
 pub struct Metadatos {
-
     path: PathBuf,
     title: Option<String>,
     performer: Option<String>,
@@ -15,9 +14,7 @@ pub struct Metadatos {
 }
 
 impl Metadatos {
-
     pub fn nuevo(path: &Path) -> Result<Self, Box<dyn Error>> {
-
         let etiqueta = Tag::read_from_path(path)?;
         let title = etiqueta.title().map(String::from);
         let performer = etiqueta.artist().map(String::from);
@@ -35,7 +32,6 @@ impl Metadatos {
             year,
             track,
         })
-
     }
 
     pub fn path(&self) -> &Path {
