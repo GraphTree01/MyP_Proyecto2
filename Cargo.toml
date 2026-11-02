@@ -5,4 +5,8 @@ edition = "2024"
 
 [dependencies]
 id3 = "1.17.2"
+rusqlite = { version = "0.32", features = ["bundled"] }
 walkdir = "2"
+
+[dev-dependencies]
+tempfile = "3"
