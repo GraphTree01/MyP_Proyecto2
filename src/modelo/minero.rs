@@ -1,3 +1,6 @@
+//! Minero que busca recursivamente archivos MP3 y extrae una versión 
+// preeliminar sus metadatos.
+
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
@@ -5,17 +8,28 @@ use walkdir::WalkDir;
 
 use crate::modelo::metadatos::Metadatos;
 
+/// Recorre un directorio para encontrar archivos MP3.
 pub struct Minero {
     path: PathBuf,
 }
 
 impl Minero {
+    /// Constructor del minero. Construye la ruta del directorio a minar.
+    ///
+    /// La ruta puede ser un directorio o a cualquier ruta que
+    /// acepte [`WalkDir`].
     pub fn nuevo(path: impl AsRef<Path>) -> Self {
         Self {
             path: path.as_ref().to_path_buf(),
         }
     }
 
+    /// Método que busca archivos con extensión `.mp3` y devuelve sus metadatos
+    /// a una función que toma como entrada en sus parámetros.
+    ///
+    /// La búsqueda es recursiva y no distingue entre mayúsculas y
+    /// minúsculas en la extensión. Si un archivo no puede recorrerse o sus
+    /// metadatos no pueden leerse, devuelve el error correspondiente.
     pub fn mina<F>(&self, mut procesar: F) -> Result<(), Box<dyn Error>>
     where
         F: FnMut(Metadatos) -> Result<(), Box<dyn Error>>,
@@ -43,6 +57,8 @@ impl Minero {
     }
 }
 
+/// Método auxiliar que verifica si una ruta contiene un archivo con 
+/// extensión `.mp3`. 
 fn es_mp3(ruta: &Path) -> bool {
     ruta.extension()
         .and_then(|extension| extension.to_str())
