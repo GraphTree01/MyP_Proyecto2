@@ -1,13 +1,48 @@
-// Clase para encapsular operaciones CRUD según el patrón de diseño DAO
-struct RolaDao {
+use std::error::Error;
+use std::path::Path;
 
-    pb fn inserta_rola() -> Rola {};
-    
-    pb fn get_rola() -> Rola {};
+use rusqlite::{Connection, params};
 
-    pb fn lee_rola(rola: Rola) -> ();
+use crate::modelo::rola::Rola;
 
-    pb fn actualiza_rola(rola: Rola) -> ();
+pub struct RolaDao;
 
-    pb fn elimina_rola(rola: Rola) -> ();
+impl RolaDao {
+    pub fn nuevo() -> Self {
+        Self
+    }
+
+    pub fn existe(&self, conexion: &Connection, ruta: &Path) -> Result<bool, Box<dyn Error>> {
+        let ruta = ruta
+            .to_str()
+            .ok_or("La ruta no puede representarse como texto UTF-8")?;
+
+        Ok(conexion.query_row(
+            "SELECT EXISTS(SELECT 1 FROM rolas WHERE path = ?1)",
+            params![ruta],
+            |fila| fila.get(0),
+        )?)
+    }
+
+    pub fn insertar(&self, conexion: &Connection, rola: &Rola) -> Result<i64, Box<dyn Error>> {
+        let ruta = rola
+            .path
+            .to_str()
+            .ok_or("La ruta no puede representarse como texto UTF-8")?;
+        conexion.execute(
+            "INSERT INTO rolas
+             (id_performer, id_album, path, title, track, year, genre)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                rola.id_performer,
+                rola.id_album,
+                ruta,
+                rola.title,
+                rola.track,
+                rola.year,
+                rola.genre
+            ],
+        )?;
+        Ok(conexion.last_insert_rowid())
+    }
 }

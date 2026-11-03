@@ -1,6 +1,6 @@
 pub struct Group {
-    id_group: u8,
-    name: String,
-    start_date: String,
-    end_date: String,
+    pub id_group: Option<i64>,
+    pub name: String,
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
 }
