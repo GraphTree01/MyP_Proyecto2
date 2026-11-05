@@ -1,4 +1,4 @@
-//! Minero que busca recursivamente archivos MP3 y extrae una versión 
+//! Minero que busca recursivamente archivos MP3 y extrae una versión
 // preeliminar sus metadatos.
 
 use std::error::Error;
@@ -57,8 +57,8 @@ impl Minero {
     }
 }
 
-/// Método auxiliar que verifica si una ruta contiene un archivo con 
-/// extensión `.mp3`. 
+/// Método auxiliar que verifica si una ruta contiene un archivo con
+/// extensión `.mp3`.
 fn es_mp3(ruta: &Path) -> bool {
     ruta.extension()
         .and_then(|extension| extension.to_str())
@@ -93,7 +93,8 @@ mod tests {
         let mp3 = directorio.path().join("cancion.mp3");
         let notas = directorio.path().join("notas.txt");
 
-        let subdirectorio = directorio.path()
+        let subdirectorio = directorio
+            .path()
             .join("subdirectorio")
             .join("otro_subdirectorio");
 

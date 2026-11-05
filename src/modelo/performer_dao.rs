@@ -1,16 +1,22 @@
+//! Clase que sigue el patron de diseño DAO para abstraer y encapsular el 
+// acceso a la tabla perfomers del esquema de la base de datos.
+
 use std::error::Error;
 
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::modelo::performer::Performer;
 
+/// Acceso a datos de la tabla `performers`.
 pub struct PerformerDao;
 
 impl PerformerDao {
+    /// Crea un DAO de intérpretes.
     pub fn nuevo() -> Self {
         Self
     }
 
+    /// Busca el identificador de un intérprete por su nombre.
     pub fn buscar_id_por_nombre(
         &self,
         conexion: &Connection,
@@ -25,6 +31,7 @@ impl PerformerDao {
             .optional()?)
     }
 
+    /// Inserta un intérprete y devuelve el identificador generado.
     pub fn insertar(
         &self,
         conexion: &Connection,

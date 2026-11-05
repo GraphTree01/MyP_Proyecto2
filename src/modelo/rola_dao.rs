@@ -1,3 +1,6 @@
+//! Clase que sigue el patron de diseño DAO para abstraer y encapsular el 
+// acceso a la tabla rolas del esquema de la base de datos.
+
 use std::error::Error;
 use std::path::Path;
 
@@ -5,13 +8,16 @@ use rusqlite::{Connection, params};
 
 use crate::modelo::rola::Rola;
 
+/// Acceso a datos de la tabla `rolas`.
 pub struct RolaDao;
 
 impl RolaDao {
+    /// Crea un DAO de canciones.
     pub fn nuevo() -> Self {
         Self
     }
 
+    /// Comprueba si ya existe una canción con la ruta indicada.
     pub fn existe(&self, conexion: &Connection, ruta: &Path) -> Result<bool, Box<dyn Error>> {
         let ruta = ruta
             .to_str()
@@ -24,6 +30,7 @@ impl RolaDao {
         )?)
     }
 
+    /// Inserta una canción y devuelve el identificador generado.
     pub fn insertar(&self, conexion: &Connection, rola: &Rola) -> Result<i64, Box<dyn Error>> {
         let ruta = rola
             .path

@@ -12,6 +12,10 @@ use crate::modelo::rola::Rola;
 use crate::modelo::rola_dao::RolaDao;
 use crate::modelo::r#type::Type;
 
+/// Coordina la importación de metadatos hacia la base de datos.
+///
+/// Cada canción se procesa dentro de una transacción. El importador aprovecha
+/// que la base de datos es relacional para evitar repetir canciones.
 pub struct Importador {
     conexion: Connection,
     rola_dao: RolaDao,
@@ -20,6 +24,7 @@ pub struct Importador {
 }
 
 impl Importador {
+    /// Instancia la base de datos y activa la validación de claves foráneas.
     pub fn nuevo(ruta_base: impl AsRef<Path>) -> Result<Self, Box<dyn Error>> {
         let conexion = Connection::open(ruta_base)?;
         conexion.execute_batch("PRAGMA foreign_keys = ON;")?;
@@ -32,6 +37,10 @@ impl Importador {
         })
     }
 
+    /// Inserta una canción y sus relaciones si la ruta aún no existe.
+    ///
+    /// Devuelve `true` cuando se inserta una canción nueva y `false` cuando
+    /// ya había una canción con la misma ruta.
     pub fn procesar(&mut self, metadatos: Metadatos) -> Result<bool, Box<dyn Error>> {
         let transaccion = self.conexion.transaction()?;
 

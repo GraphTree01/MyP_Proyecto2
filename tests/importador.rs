@@ -1,19 +1,22 @@
+//!Pruebas de integración del Importador; componente del Modelo del proyecto.
+
 use std::fs;
 
 use id3::{Tag, TagLike, Version};
 use proyecto2::modelo::importador::Importador;
 use proyecto2::modelo::metadatos::Metadatos;
 use rusqlite::Connection;
-use tempfile::tempdir;
 use std::path::PathBuf;
+use tempfile::tempdir;
 
+/// Verifica el flujo completo de lectura, importación y persistencia de una
+/// canción, incluyendo la prevención de duplicados.
 #[test]
 fn importa_canciones() {
     let directorio = tempdir().unwrap();
     let ruta_base = directorio.path().join("prueba.db");
     let ruta_mp3 = directorio.path().join("cancion.mp3");
-    let archivo_mp3 = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("beep.mp3");
+    let archivo_mp3 = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("beep.mp3");
 
     fs::copy(archivo_mp3, &ruta_mp3).unwrap();
 
@@ -24,9 +27,7 @@ fn importa_canciones() {
     etiqueta.set_genre("Rock");
     etiqueta.set_year(1980);
     etiqueta.set_track(10);
-    etiqueta
-        .write_to_path(&ruta_mp3, Version::Id3v24)
-        .unwrap();
+    etiqueta.write_to_path(&ruta_mp3, Version::Id3v24).unwrap();
 
     let conexion = Connection::open(&ruta_base).unwrap();
     conexion

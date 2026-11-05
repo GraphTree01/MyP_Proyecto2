@@ -1,3 +1,4 @@
+/// Enumeración que representa el tipo de un posible artista (performer)
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Type {
     Person,

@@ -1,3 +1,6 @@
+//! Clase que sigue el patron de diseño DAO para abstraer y encapsular el 
+// acceso a la tabla albums del esquema de la base de datos.
+
 use std::error::Error;
 use std::path::Path;
 
@@ -5,13 +8,16 @@ use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::modelo::album::Album;
 
+/// Acceso a datos de la tabla `albums`.
 pub struct AlbumDao;
 
 impl AlbumDao {
+    /// Crea un DAO de álbumes.
     pub fn nuevo() -> Self {
         Self
     }
 
+    /// Busca el identificador de un álbum por su nombre.
     pub fn buscar_id_por_nombre(
         &self,
         conexion: &Connection,
@@ -26,6 +32,7 @@ impl AlbumDao {
             .optional()?)
     }
 
+    /// Inserta un álbum y devuelve el identificador generado.
     pub fn insertar(&self, conexion: &Connection, album: &Album) -> Result<i64, Box<dyn Error>> {
         let ruta = album.path.as_deref().and_then(Path::to_str);
         conexion.execute(
