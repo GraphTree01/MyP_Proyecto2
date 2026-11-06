@@ -1,3 +1,5 @@
+//! Modelo de datos y componentes de persistencia de la aplicación.
+
 pub mod album;
 pub mod album_dao;
 pub mod group;

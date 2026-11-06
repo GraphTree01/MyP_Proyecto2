@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+gtk = { package = "gtk4", version = "0.10" }
 id3 = "1.17.2"
 rusqlite = { version = "0.32", features = ["bundled"] }
 walkdir = "2"
