@@ -1,4 +1,4 @@
-use crate::vista::vista::Vista;
+use crate::vista::interfaz::Vista;
 
 /// Punto de entrada del flujo de la aplicación.
 pub struct Aplicacion {
