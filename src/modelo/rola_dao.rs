@@ -1,4 +1,4 @@
-//! Clase que sigue el patron de diseño DAO para abstraer y encapsular el 
+//! Clase que sigue el patron de diseño DAO para abstraer y encapsular el
 // acceso a la tabla rolas del esquema de la base de datos.
 
 use std::error::Error;
