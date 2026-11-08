@@ -28,8 +28,9 @@ impl Minero {
     /// a una función que toma como entrada en sus parámetros.
     ///
     /// La búsqueda es recursiva y no distingue entre mayúsculas y
-    /// minúsculas en la extensión. Si un archivo no puede recorrerse o sus
-    /// metadatos no pueden leerse, devuelve el error correspondiente.
+    /// minúsculas en la extensión. Si no se pueden extraer los metadatos de
+    /// un archivo, lo omite y continúa con el siguiente. Los errores al
+    /// recorrer el directorio o al procesar los metadatos se devuelven.
     pub fn mina<F>(&self, mut procesar: F) -> Result<(), Box<dyn Error>>
     where
         F: FnMut(Metadatos) -> Result<(), Box<dyn Error>>,
@@ -49,7 +50,9 @@ impl Minero {
                 continue;
             }
 
-            let metadatos = Metadatos::nuevo(ruta)?;
+            let Ok(metadatos) = Metadatos::nuevo(ruta) else {
+                continue;
+            };
             procesar(metadatos)?;
         }
 
