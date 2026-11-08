@@ -19,3 +19,15 @@ pub struct Rola {
     /// Género musical, si está disponible.
     pub genre: Option<String>,
 }
+
+/// Datos mínimos de una canción para mostrarlos en forma de tabla.
+pub struct Rolita {
+    /// Título de la canción.
+    pub titulo: String,
+    /// Nombre del intérprete.
+    pub performer: String,
+    /// Nombre del álbum.
+    pub album: String,
+    /// Género musical, si está disponible.
+    pub genero: Option<String>,
+}

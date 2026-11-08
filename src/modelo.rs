@@ -6,6 +6,7 @@ pub mod group;
 pub mod importador;
 pub mod metadatos;
 pub mod minero;
+pub mod operaciones;
 pub mod performer;
 pub mod performer_dao;
 pub mod person;

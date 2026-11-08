@@ -5,6 +5,7 @@ use std::fs;
 use id3::{Tag, TagLike, Version};
 use proyecto2::modelo::importador::Importador;
 use proyecto2::modelo::metadatos::Metadatos;
+use proyecto2::modelo::operaciones::Operaciones;
 use rusqlite::Connection;
 use std::path::PathBuf;
 use tempfile::tempdir;
@@ -75,6 +76,16 @@ fn importa_canciones() {
             Some(10),
         )
     );
+
+    let canciones = Operaciones::nueva(&ruta_base)
+        .unwrap()
+        .listar_canciones()
+        .unwrap();
+    assert_eq!(canciones.len(), 1);
+    assert_eq!(canciones[0].titulo, "Canción génerica");
+    assert_eq!(canciones[0].performer, "Artista del momento");
+    assert_eq!(canciones[0].album, "Álbum cualquiera");
+    assert_eq!(canciones[0].genero.as_deref(), Some("Rock"));
 
     let cantidad: i64 = conexion
         .query_row("SELECT COUNT(*) FROM rolas", [], |fila| fila.get(0))

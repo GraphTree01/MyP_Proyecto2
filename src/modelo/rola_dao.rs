@@ -6,7 +6,7 @@ use std::path::Path;
 
 use rusqlite::{Connection, params};
 
-use crate::modelo::rola::Rola;
+use crate::modelo::rola::{Rola, Rolita};
 
 /// Acceso a datos de la tabla `rolas`.
 pub struct RolaDao;
@@ -51,5 +51,27 @@ impl RolaDao {
             ],
         )?;
         Ok(conexion.last_insert_rowid())
+    }
+
+    /// Devuelve las canciones e identificadores de la base de datos.
+    pub fn listar(&self, conexion: &Connection) -> Result<Vec<Rolita>, Box<dyn Error>> {
+        let mut consulta = conexion.prepare(
+            "SELECT r.title, p.name, a.name, r.genre
+             FROM rolas r
+             JOIN performers p ON p.id_performer = r.id_performer
+             JOIN albums a ON a.id_album = r.id_album
+             ORDER BY r.title, p.name, a.name",
+        )?;
+
+        let filas = consulta.query_map([], |fila| {
+            Ok(Rolita {
+                titulo: fila.get(0)?,
+                performer: fila.get(1)?,
+                album: fila.get(2)?,
+                genero: fila.get(3)?,
+            })
+        })?;
+
+        Ok(filas.collect::<Result<Vec<_>, _>>()?)
     }
 }
