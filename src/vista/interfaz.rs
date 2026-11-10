@@ -1,7 +1,7 @@
 use gtk::prelude::*;
 use gtk::{
-    self, Application, ApplicationWindow, Box as GtkBox, Button, Grid, HeaderBar, Label,
-    Orientation, ScrolledWindow, Separator,
+    self, Application, ApplicationWindow, Box as GtkBox, Button, Grid, HeaderBar, Image, Label,
+    Orientation, ScrolledWindow, Separator, ToggleButton,
 };
 
 const APP_ID: &str = "com.proyecto_dos.myp";
@@ -27,21 +27,16 @@ impl Vista {
 
     fn construir_ui(application: &Application, cantidad_rolas: i64) {
         let header = Self::construir_header(cantidad_rolas);
-        let button = Button::with_label("Cambiar derecha");
-        header.pack_end(&button);
+        header.pack_end(&Self::construir_botones_encabezado());
 
         let contenido = GtkBox::new(Orientation::Horizontal, 0);
         let izquierda = Self::construir_panel_izquierdo();
-        let (derecha, mensaje) = Self::construir_panel_derecho();
+        let derecha = Self::construir_panel_derecho();
         let separador = Separator::new(Orientation::Vertical);
 
         contenido.append(&izquierda);
         contenido.append(&separador);
         contenido.append(&derecha);
-
-        button.connect_clicked(move |_| {
-            mensaje.set_text("Contenido actualizado");
-        });
 
         let window = ApplicationWindow::builder()
             .application(application)
@@ -68,6 +63,34 @@ impl Vista {
         header
     }
 
+    fn construir_botones_encabezado() -> GtkBox {
+        let controles = GtkBox::new(Orientation::Horizontal, 8);
+        let botones_vista = GtkBox::new(Orientation::Horizontal, 0);
+        botones_vista.add_css_class("linked");
+
+        let boton_tabla = ToggleButton::new();
+        boton_tabla.set_child(Some(&Image::from_icon_name("view-list-symbolic")));
+        boton_tabla.set_tooltip_text(Some("Vista de tabla"));
+        boton_tabla.set_active(true);
+
+        let boton_alternativo = ToggleButton::new();
+        boton_alternativo.set_child(Some(&Image::from_icon_name("view-grid-symbolic")));
+        boton_alternativo.set_tooltip_text(Some("Vista alternativa (próximamente)"));
+        boton_alternativo.set_group(Some(&boton_tabla));
+        boton_alternativo.set_sensitive(false);
+
+        botones_vista.append(&boton_tabla);
+        botones_vista.append(&boton_alternativo);
+
+        let boton_buscar = Button::from_icon_name("system-search-symbolic");
+        boton_buscar.set_tooltip_text(Some("Buscar rolas (próximamente)"));
+        boton_buscar.set_sensitive(false);
+
+        controles.append(&botones_vista);
+        controles.append(&boton_buscar);
+        controles
+    }
+
     fn construir_panel_izquierdo() -> GtkBox {
         let panel = GtkBox::new(Orientation::Vertical, 10);
         panel.set_size_request(260, -1);
@@ -78,7 +101,7 @@ impl Vista {
         panel
     }
 
-    fn construir_panel_derecho() -> (GtkBox, Label) {
+    fn construir_panel_derecho() -> GtkBox {
         let panel = GtkBox::new(Orientation::Vertical, 0);
         panel.set_hexpand(true);
         panel.set_vexpand(true);
@@ -87,11 +110,7 @@ impl Vista {
         panel.set_margin_top(12);
         panel.set_margin_bottom(12);
         panel.append(&Self::construir_tabla_canciones());
-
-        let mensaje = Label::new(Some("No hay canciones cargadas"));
-        panel.append(&mensaje);
-
-        (panel, mensaje)
+        panel
     }
 
     fn construir_tabla_canciones() -> ScrolledWindow {
