@@ -1,10 +1,10 @@
-use std::error::Error;
 use std::path::Path;
 
 use rusqlite::Connection;
 
 use crate::modelo::album::Album;
 use crate::modelo::album_dao::AlbumDao;
+use crate::modelo::error::ErrorModelo;
 use crate::modelo::metadatos::Metadatos;
 use crate::modelo::performer::Performer;
 use crate::modelo::performer_dao::PerformerDao;
@@ -25,7 +25,7 @@ pub struct Importador {
 
 impl Importador {
     /// Instancia la base de datos y activa la validación de claves foráneas.
-    pub fn nuevo(ruta_base: impl AsRef<Path>) -> Result<Self, Box<dyn Error>> {
+    pub fn nuevo(ruta_base: impl AsRef<Path>) -> Result<Self, ErrorModelo> {
         let conexion = Connection::open(ruta_base)?;
         conexion.execute_batch("PRAGMA foreign_keys = ON;")?;
 
@@ -41,7 +41,7 @@ impl Importador {
     ///
     /// Devuelve `true` cuando se inserta una canción nueva y `false` cuando
     /// ya había una canción con la misma ruta.
-    pub fn procesar(&mut self, metadatos: Metadatos) -> Result<bool, Box<dyn Error>> {
+    pub fn procesar(&mut self, metadatos: Metadatos) -> Result<bool, ErrorModelo> {
         let transaccion = self.conexion.transaction()?;
 
         if self.rola_dao.existe(&transaccion, metadatos.path())? {
@@ -59,7 +59,7 @@ impl Importador {
                     .and_then(|nombre| nombre.to_str())
                     .map(String::from)
             })
-            .ok_or("No se pudo determinar el título de la rola")?;
+            .ok_or_else(|| ErrorModelo::TituloNoDisponible(metadatos.path().to_path_buf()))?;
 
         let performer_nombre = metadatos.performer().unwrap_or("Unknown");
         let id_performer = match self

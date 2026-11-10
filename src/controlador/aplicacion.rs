@@ -1,5 +1,4 @@
-use std::error::Error;
-
+use crate::modelo::error::ErrorModelo;
 use crate::modelo::operaciones::Operaciones;
 use crate::vista::interfaz::Vista;
 
@@ -11,7 +10,7 @@ pub struct Aplicacion {
 
 impl Aplicacion {
     /// Crea una aplicación lista para iniciar.
-    pub fn nueva() -> Result<Self, Box<dyn Error>> {
+    pub fn nueva() -> Result<Self, ErrorModelo> {
         Ok(Self {
             vista: Vista::nueva(),
             operaciones: Operaciones::nueva("rolas.db")?,
@@ -19,7 +18,7 @@ impl Aplicacion {
     }
 
     /// Consulta la biblioteca y entrega su conteo inicial a la vista.
-    pub fn iniciar(&self) -> Result<(), Box<dyn Error>> {
+    pub fn iniciar(&self) -> Result<(), ErrorModelo> {
         let cantidad_rolas = self.operaciones.contar_canciones()?;
         self.vista.iniciar(cantidad_rolas);
         Ok(())

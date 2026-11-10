@@ -1,11 +1,11 @@
 //! Minero que busca recursivamente archivos MP3 y extrae una versión
 // preeliminar sus metadatos.
 
-use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use walkdir::WalkDir;
 
+use crate::modelo::error::ErrorModelo;
 use crate::modelo::metadatos::Metadatos;
 
 /// Recorre un directorio para encontrar archivos MP3.
@@ -31,9 +31,9 @@ impl Minero {
     /// minúsculas en la extensión. Si no se pueden extraer los metadatos de
     /// un archivo, lo omite y continúa con el siguiente. Los errores al
     /// recorrer el directorio o al procesar los metadatos se devuelven.
-    pub fn mina<F>(&self, mut procesar: F) -> Result<(), Box<dyn Error>>
+    pub fn mina<F>(&self, mut procesar: F) -> Result<(), ErrorModelo>
     where
-        F: FnMut(Metadatos) -> Result<(), Box<dyn Error>>,
+        F: FnMut(Metadatos) -> Result<(), ErrorModelo>,
     {
         let buscador = WalkDir::new(&self.path).contents_first(true);
 

@@ -1,12 +1,12 @@
-//! Clase que sigue el patron de diseño DAO para abstraer y encapsular el 
+//! Clase que sigue el patron de diseño DAO para abstraer y encapsular el
 // acceso a la tabla albums del esquema de la base de datos.
 
-use std::error::Error;
 use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::modelo::album::Album;
+use crate::modelo::error::ErrorModelo;
 
 /// Acceso a datos de la tabla `albums`.
 pub struct AlbumDao;
@@ -22,7 +22,7 @@ impl AlbumDao {
         &self,
         conexion: &Connection,
         nombre: &str,
-    ) -> Result<Option<i64>, Box<dyn Error>> {
+    ) -> Result<Option<i64>, ErrorModelo> {
         Ok(conexion
             .query_row(
                 "SELECT id_album FROM albums WHERE name = ?1 LIMIT 1",
@@ -33,7 +33,7 @@ impl AlbumDao {
     }
 
     /// Inserta un álbum y devuelve el identificador generado.
-    pub fn insertar(&self, conexion: &Connection, album: &Album) -> Result<i64, Box<dyn Error>> {
+    pub fn insertar(&self, conexion: &Connection, album: &Album) -> Result<i64, ErrorModelo> {
         let ruta = album.path.as_deref().and_then(Path::to_str);
         conexion.execute(
             "INSERT INTO albums (path, name, year) VALUES (?1, ?2, ?3)",

@@ -1,9 +1,10 @@
 //! Metadatos generales asociados a archivos MP3.
 
-use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use id3::{Tag, TagLike};
+
+use crate::modelo::error::ErrorModelo;
 
 /// Metadatos extraídos de la etiqueta ID3 de un archivo de audio.
 ///
@@ -25,8 +26,11 @@ impl Metadatos {
     ///
     /// Devuelve un error si el archivo no puede abrirse o si su etiqueta no
     /// puede interpretarse.
-    pub fn nuevo(path: &Path) -> Result<Self, Box<dyn Error>> {
-        let etiqueta = Tag::read_from_path(path)?;
+    pub fn nuevo(path: &Path) -> Result<Self, ErrorModelo> {
+        let etiqueta = Tag::read_from_path(path).map_err(|fuente| ErrorModelo::LecturaId3 {
+            ruta: path.to_path_buf(),
+            fuente,
+        })?;
         let title = etiqueta.title().map(String::from);
         let performer = etiqueta.artist().map(String::from);
         let album = etiqueta.album().map(String::from);

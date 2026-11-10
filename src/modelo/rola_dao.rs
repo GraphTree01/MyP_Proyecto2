@@ -1,11 +1,11 @@
 //! Clase que sigue el patron de diseño DAO para abstraer y encapsular el
 // acceso a la tabla rolas del esquema de la base de datos.
 
-use std::error::Error;
 use std::path::Path;
 
 use rusqlite::{Connection, params};
 
+use crate::modelo::error::ErrorModelo;
 use crate::modelo::rola::{Rola, Rolita};
 
 /// Acceso a datos de la tabla `rolas`.
@@ -18,10 +18,10 @@ impl RolaDao {
     }
 
     /// Comprueba si ya existe una canción con la ruta indicada.
-    pub fn existe(&self, conexion: &Connection, ruta: &Path) -> Result<bool, Box<dyn Error>> {
+    pub fn existe(&self, conexion: &Connection, ruta: &Path) -> Result<bool, ErrorModelo> {
         let ruta = ruta
             .to_str()
-            .ok_or("La ruta no puede representarse como texto UTF-8")?;
+            .ok_or_else(|| ErrorModelo::RutaNoRepresentable(ruta.to_path_buf()))?;
 
         Ok(conexion.query_row(
             "SELECT EXISTS(SELECT 1 FROM rolas WHERE path = ?1)",
@@ -31,11 +31,11 @@ impl RolaDao {
     }
 
     /// Inserta una canción y devuelve el identificador generado.
-    pub fn insertar(&self, conexion: &Connection, rola: &Rola) -> Result<i64, Box<dyn Error>> {
+    pub fn insertar(&self, conexion: &Connection, rola: &Rola) -> Result<i64, ErrorModelo> {
         let ruta = rola
             .path
             .to_str()
-            .ok_or("La ruta no puede representarse como texto UTF-8")?;
+            .ok_or_else(|| ErrorModelo::RutaNoRepresentable(rola.path.clone()))?;
         conexion.execute(
             "INSERT INTO rolas
              (id_performer, id_album, path, title, track, year, genre)
@@ -54,12 +54,12 @@ impl RolaDao {
     }
 
     /// Devuelve la cantidad de canciones almacenadas.
-    pub fn contar(&self, conexion: &Connection) -> Result<i64, Box<dyn Error>> {
+    pub fn contar(&self, conexion: &Connection) -> Result<i64, ErrorModelo> {
         Ok(conexion.query_row("SELECT COUNT(*) FROM rolas", [], |fila| fila.get(0))?)
     }
 
     /// Devuelve las canciones e identificadores de la base de datos.
-    pub fn listar(&self, conexion: &Connection) -> Result<Vec<Rolita>, Box<dyn Error>> {
+    pub fn listar(&self, conexion: &Connection) -> Result<Vec<Rolita>, ErrorModelo> {
         let mut consulta = conexion.prepare(
             "SELECT r.title, p.name, a.name, r.genre
              FROM rolas r
