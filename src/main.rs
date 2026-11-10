@@ -1,6 +1,9 @@
+use std::error::Error;
+
 use proyecto2::controlador::aplicacion::Aplicacion;
 
-fn main() {
-    let aplicacion = Aplicacion::nueva();
-    aplicacion.iniciar();
+fn main() -> Result<(), Box<dyn Error>> {
+    let aplicacion = Aplicacion::nueva()?;
+    aplicacion.iniciar()?;
+    Ok(())
 }

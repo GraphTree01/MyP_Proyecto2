@@ -19,13 +19,14 @@ impl Vista {
     }
 
     /// Inicia el ciclo de vida de la interfaz gráfica GTK.
-    pub fn iniciar(&self) {
-        self.aplicacion.connect_activate(Self::construir_ui);
+    pub fn iniciar(&self, cantidad_rolas: i64) {
+        self.aplicacion
+            .connect_activate(move |application| Self::construir_ui(application, cantidad_rolas));
         self.aplicacion.run();
     }
 
-    fn construir_ui(application: &Application) {
-        let header = Self::construir_header();
+    fn construir_ui(application: &Application, cantidad_rolas: i64) {
+        let header = Self::construir_header(cantidad_rolas);
         let button = Button::with_label("Cambiar derecha");
         header.pack_end(&button);
 
@@ -54,12 +55,12 @@ impl Vista {
         window.present();
     }
 
-    fn construir_header() -> HeaderBar {
+    fn construir_header(cantidad_rolas: i64) -> HeaderBar {
         let header = HeaderBar::new();
         let titulo_header = GtkBox::new(Orientation::Vertical, 0);
         let titulo = Label::new(Some("Rolas"));
         titulo.add_css_class("title");
-        let subtitulo = Label::new(Some("0 rolas"));
+        let subtitulo = Label::new(Some(&format!("{cantidad_rolas} rolas")));
         subtitulo.add_css_class("subtitle");
         titulo_header.append(&titulo);
         titulo_header.append(&subtitulo);

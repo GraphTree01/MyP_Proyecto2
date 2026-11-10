@@ -53,6 +53,11 @@ impl RolaDao {
         Ok(conexion.last_insert_rowid())
     }
 
+    /// Devuelve la cantidad de canciones almacenadas.
+    pub fn contar(&self, conexion: &Connection) -> Result<i64, Box<dyn Error>> {
+        Ok(conexion.query_row("SELECT COUNT(*) FROM rolas", [], |fila| fila.get(0))?)
+    }
+
     /// Devuelve las canciones e identificadores de la base de datos.
     pub fn listar(&self, conexion: &Connection) -> Result<Vec<Rolita>, Box<dyn Error>> {
         let mut consulta = conexion.prepare(
