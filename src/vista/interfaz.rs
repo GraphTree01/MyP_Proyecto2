@@ -1,8 +1,10 @@
 use gtk::prelude::*;
 use gtk::{
-    self, Application, ApplicationWindow, Box as GtkBox, Button, Grid, HeaderBar, Image, Label,
-    Orientation, ScrolledWindow, Separator, ToggleButton,
+    self, Application, ApplicationWindow, Box as GtkBox, Button, FileDialog, Grid, HeaderBar,
+    Image, Label, Orientation, ScrolledWindow, Separator, ToggleButton,
 };
+use std::path::PathBuf;
+use std::rc::Rc;
 
 const APP_ID: &str = "com.proyecto_dos.myp";
 
@@ -19,19 +21,23 @@ impl Vista {
     }
 
     /// Inicia el ciclo de vida de la interfaz gráfica GTK.
-    pub fn iniciar(&self, cantidad_rolas: i64) {
-        self.aplicacion
-            .connect_activate(move |application| Self::construir_ui(application, cantidad_rolas));
+    pub fn iniciar<F>(&self, cantidad_rolas: i64, al_minar: F)
+    where
+        F: Fn(PathBuf) -> Result<i64, String> + Clone + 'static,
+    {
+        self.aplicacion.connect_activate(move |application| {
+            Self::construir_ui(application, cantidad_rolas, al_minar.clone())
+        });
         self.aplicacion.run();
     }
 
-    fn construir_ui(application: &Application, cantidad_rolas: i64) {
-        let header = Self::construir_header(cantidad_rolas);
-        header.pack_end(&Self::construir_botones_encabezado());
-
+    fn construir_ui<F>(application: &Application, cantidad_rolas: i64, al_minar: F)
+    where
+        F: Fn(PathBuf) -> Result<i64, String> + 'static,
+    {
         let contenido = GtkBox::new(Orientation::Horizontal, 0);
         let izquierda = Self::construir_panel_izquierdo();
-        let derecha = Self::construir_panel_derecho();
+        let (derecha, mensaje) = Self::construir_panel_derecho();
         let separador = Separator::new(Orientation::Vertical);
 
         contenido.append(&izquierda);
@@ -45,12 +51,19 @@ impl Vista {
             .default_height(650)
             .build();
 
+        let (header, subtitulo) = Self::construir_header(cantidad_rolas);
+        header.pack_end(&Self::construir_botones_encabezado(
+            &window,
+            Rc::new(al_minar),
+            subtitulo,
+            mensaje,
+        ));
         window.set_titlebar(Some(&header));
         window.set_child(Some(&contenido));
         window.present();
     }
 
-    fn construir_header(cantidad_rolas: i64) -> HeaderBar {
+    fn construir_header(cantidad_rolas: i64) -> (HeaderBar, Label) {
         let header = HeaderBar::new();
         let titulo_header = GtkBox::new(Orientation::Vertical, 0);
         let titulo = Label::new(Some("Rolas"));
@@ -60,10 +73,15 @@ impl Vista {
         titulo_header.append(&titulo);
         titulo_header.append(&subtitulo);
         header.set_title_widget(Some(&titulo_header));
-        header
+        (header, subtitulo)
     }
 
-    fn construir_botones_encabezado() -> GtkBox {
+    fn construir_botones_encabezado(
+        window: &ApplicationWindow,
+        al_minar: Rc<dyn Fn(PathBuf) -> Result<i64, String>>,
+        subtitulo: Label,
+        mensaje: Label,
+    ) -> GtkBox {
         let controles = GtkBox::new(Orientation::Horizontal, 8);
         let botones_vista = GtkBox::new(Orientation::Horizontal, 0);
         botones_vista.add_css_class("linked");
@@ -88,7 +106,59 @@ impl Vista {
 
         controles.append(&botones_vista);
         controles.append(&boton_buscar);
+
+        let boton_minar = Button::from_icon_name("folder-open-symbolic");
+        boton_minar.set_tooltip_text(Some("Minar carpeta de música"));
+        controles.append(&boton_minar);
+
+        Self::conectar_boton_minar(&boton_minar, window, al_minar, subtitulo, mensaje);
+
         controles
+    }
+
+    fn conectar_boton_minar(
+        boton: &Button,
+        window: &ApplicationWindow,
+        al_minar: Rc<dyn Fn(PathBuf) -> Result<i64, String>>,
+        subtitulo: Label,
+        mensaje: Label,
+    ) {
+        let padre = window.clone();
+        boton.connect_clicked(move |_| {
+            let selector = FileDialog::new();
+            selector.set_title("Seleccionar carpeta de música");
+            selector.set_accept_label(Some("Minar"));
+            selector.set_modal(true);
+            let al_minar = Rc::clone(&al_minar);
+            let subtitulo = subtitulo.clone();
+            let mensaje = mensaje.clone();
+            selector.select_folder(
+                Some(&padre),
+                None::<&gtk::gio::Cancellable>,
+                move |resultado| match resultado {
+                    Ok(carpeta) => {
+                        if let Some(directorio) = carpeta.path() {
+                            mensaje.set_text("Minando archivos MP3...");
+                            match al_minar(directorio) {
+                                Ok(cantidad) => {
+                                    subtitulo.set_text(&format!("{cantidad} rolas"));
+                                    mensaje.set_text("Minado completado.");
+                                }
+                                Err(error) => {
+                                    mensaje.set_text(&format!("Error al minar: {error}"));
+                                }
+                            }
+                        } else {
+                            mensaje.set_text("No se pudo obtener la ruta de la carpeta.");
+                        }
+                    }
+                    Err(error) if error.matches(gtk::gio::IOErrorEnum::Cancelled) => {}
+                    Err(error) => mensaje.set_text(&format!(
+                        "No se pudo abrir el selector de carpetas: {error}"
+                    )),
+                },
+            );
+        });
     }
 
     fn construir_panel_izquierdo() -> GtkBox {
@@ -101,7 +171,7 @@ impl Vista {
         panel
     }
 
-    fn construir_panel_derecho() -> GtkBox {
+    fn construir_panel_derecho() -> (GtkBox, Label) {
         let panel = GtkBox::new(Orientation::Vertical, 0);
         panel.set_hexpand(true);
         panel.set_vexpand(true);
@@ -110,7 +180,10 @@ impl Vista {
         panel.set_margin_top(12);
         panel.set_margin_bottom(12);
         panel.append(&Self::construir_tabla_canciones());
-        panel
+
+        let mensaje = Label::new(Some(""));
+        panel.append(&mensaje);
+        (panel, mensaje)
     }
 
     fn construir_tabla_canciones() -> ScrolledWindow {
