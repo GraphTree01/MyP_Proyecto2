@@ -1,3 +1,4 @@
+use crate::modelo::rola::Rolita;
 use gtk::prelude::*;
 use gtk::{
     self, Application, ApplicationWindow, Box as GtkBox, Button, FileDialog, Grid, HeaderBar,
@@ -21,23 +22,23 @@ impl Vista {
     }
 
     /// Inicia el ciclo de vida de la interfaz gráfica GTK.
-    pub fn iniciar<F>(&self, cantidad_rolas: i64, al_minar: F)
+    pub fn iniciar<F>(&self, rolas: Vec<Rolita>, al_minar: F)
     where
-        F: Fn(PathBuf) -> Result<i64, String> + Clone + 'static,
+        F: Fn(PathBuf) -> Result<Vec<Rolita>, String> + Clone + 'static,
     {
         self.aplicacion.connect_activate(move |application| {
-            Self::construir_ui(application, cantidad_rolas, al_minar.clone())
+            Self::construir_ui(application, rolas.clone(), al_minar.clone())
         });
         self.aplicacion.run();
     }
 
-    fn construir_ui<F>(application: &Application, cantidad_rolas: i64, al_minar: F)
+    fn construir_ui<F>(application: &Application, rolas: Vec<Rolita>, al_minar: F)
     where
-        F: Fn(PathBuf) -> Result<i64, String> + 'static,
+        F: Fn(PathBuf) -> Result<Vec<Rolita>, String> + 'static,
     {
         let contenido = GtkBox::new(Orientation::Horizontal, 0);
         let izquierda = Self::construir_panel_izquierdo();
-        let (derecha, mensaje) = Self::construir_panel_derecho();
+        let (derecha, tabla, mensaje) = Self::construir_panel_derecho(&rolas);
         let separador = Separator::new(Orientation::Vertical);
 
         contenido.append(&izquierda);
@@ -51,19 +52,20 @@ impl Vista {
             .default_height(650)
             .build();
 
-        let (header, subtitulo) = Self::construir_header(cantidad_rolas);
+        let (header, subtitulo) = Self::construir_header(rolas.len());
         header.pack_end(&Self::construir_botones_encabezado(
             &window,
             Rc::new(al_minar),
             subtitulo,
             mensaje,
+            tabla,
         ));
         window.set_titlebar(Some(&header));
         window.set_child(Some(&contenido));
         window.present();
     }
 
-    fn construir_header(cantidad_rolas: i64) -> (HeaderBar, Label) {
+    fn construir_header(cantidad_rolas: usize) -> (HeaderBar, Label) {
         let header = HeaderBar::new();
         let titulo_header = GtkBox::new(Orientation::Vertical, 0);
         let titulo = Label::new(Some("Rolas"));
@@ -78,9 +80,10 @@ impl Vista {
 
     fn construir_botones_encabezado(
         window: &ApplicationWindow,
-        al_minar: Rc<dyn Fn(PathBuf) -> Result<i64, String>>,
+        al_minar: Rc<dyn Fn(PathBuf) -> Result<Vec<Rolita>, String>>,
         subtitulo: Label,
         mensaje: Label,
+        tabla: Grid,
     ) -> GtkBox {
         let controles = GtkBox::new(Orientation::Horizontal, 8);
         let botones_vista = GtkBox::new(Orientation::Horizontal, 0);
@@ -111,7 +114,7 @@ impl Vista {
         boton_minar.set_tooltip_text(Some("Minar carpeta de música"));
         controles.append(&boton_minar);
 
-        Self::conectar_boton_minar(&boton_minar, window, al_minar, subtitulo, mensaje);
+        Self::conectar_boton_minar(&boton_minar, window, al_minar, subtitulo, mensaje, tabla);
 
         controles
     }
@@ -119,9 +122,10 @@ impl Vista {
     fn conectar_boton_minar(
         boton: &Button,
         window: &ApplicationWindow,
-        al_minar: Rc<dyn Fn(PathBuf) -> Result<i64, String>>,
+        al_minar: Rc<dyn Fn(PathBuf) -> Result<Vec<Rolita>, String>>,
         subtitulo: Label,
         mensaje: Label,
+        tabla: Grid,
     ) {
         let padre = window.clone();
         boton.connect_clicked(move |_| {
@@ -132,6 +136,7 @@ impl Vista {
             let al_minar = Rc::clone(&al_minar);
             let subtitulo = subtitulo.clone();
             let mensaje = mensaje.clone();
+            let tabla = tabla.clone();
             selector.select_folder(
                 Some(&padre),
                 None::<&gtk::gio::Cancellable>,
@@ -140,8 +145,9 @@ impl Vista {
                         if let Some(directorio) = carpeta.path() {
                             mensaje.set_text("Minando archivos MP3...");
                             match al_minar(directorio) {
-                                Ok(cantidad) => {
-                                    subtitulo.set_text(&format!("{cantidad} rolas"));
+                                Ok(rolas) => {
+                                    actualizar_tabla(&tabla, &rolas);
+                                    subtitulo.set_text(&format!("{} rolas", rolas.len()));
                                     mensaje.set_text("Minado completado.");
                                 }
                                 Err(error) => {
@@ -171,7 +177,7 @@ impl Vista {
         panel
     }
 
-    fn construir_panel_derecho() -> (GtkBox, Label) {
+    fn construir_panel_derecho(rolas: &[Rolita]) -> (GtkBox, Grid, Label) {
         let panel = GtkBox::new(Orientation::Vertical, 0);
         panel.set_hexpand(true);
         panel.set_vexpand(true);
@@ -179,31 +185,54 @@ impl Vista {
         panel.set_margin_end(16);
         panel.set_margin_top(12);
         panel.set_margin_bottom(12);
-        panel.append(&Self::construir_tabla_canciones());
+        let (tabla_desplazable, tabla) = Self::construir_tabla_canciones(rolas);
+        panel.append(&tabla_desplazable);
 
         let mensaje = Label::new(Some(""));
         panel.append(&mensaje);
-        (panel, mensaje)
+        (panel, tabla, mensaje)
     }
 
-    fn construir_tabla_canciones() -> ScrolledWindow {
+    fn construir_tabla_canciones(rolas: &[Rolita]) -> (ScrolledWindow, Grid) {
         let tabla = Grid::new();
         tabla.set_column_spacing(16);
         tabla.set_row_spacing(0);
         tabla.add_css_class("view");
 
-        for (columna, titulo) in ["Title", "Performer", "Album", "Genre"].iter().enumerate() {
-            agregar_celda(&tabla, titulo, columna as i32, 0, true);
-        }
+        actualizar_tabla(&tabla, rolas);
 
-        let separador = Separator::new(Orientation::Horizontal);
-        tabla.attach(&separador, 0, 1, 4, 1);
-
-        ScrolledWindow::builder()
+        let desplazamiento = ScrolledWindow::builder()
             .child(&tabla)
             .vexpand(true)
             .hexpand(true)
-            .build()
+            .build();
+        (desplazamiento, tabla)
+    }
+}
+
+fn actualizar_tabla(tabla: &Grid, rolas: &[Rolita]) {
+    while let Some(hijo) = tabla.first_child() {
+        tabla.remove(&hijo);
+    }
+
+    for (columna, titulo) in ["Title", "Performer", "Album", "Genre"].iter().enumerate() {
+        agregar_celda(tabla, titulo, columna as i32, 0, true);
+    }
+
+    let separador = Separator::new(Orientation::Horizontal);
+    tabla.attach(&separador, 0, 1, 4, 1);
+
+    for (indice, rola) in rolas.iter().enumerate() {
+        let fila = (indice as i32) * 2 + 2;
+        agregar_celda(tabla, &rola.titulo, 0, fila, false);
+        agregar_celda(tabla, &rola.performer, 1, fila, false);
+        agregar_celda(tabla, &rola.album, 2, fila, false);
+        agregar_celda(tabla, rola.genero.as_deref().unwrap_or("—"), 3, fila, false);
+
+        if indice + 1 < rolas.len() {
+            let separador = Separator::new(Orientation::Horizontal);
+            tabla.attach(&separador, 0, fila + 1, 4, 1);
+        }
     }
 }
 

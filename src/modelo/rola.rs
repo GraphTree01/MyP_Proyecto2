@@ -21,6 +21,7 @@ pub struct Rola {
 }
 
 /// Datos mínimos de una canción para mostrarlos en forma de tabla.
+#[derive(Clone)]
 pub struct Rolita {
     /// Título de la canción.
     pub titulo: String,

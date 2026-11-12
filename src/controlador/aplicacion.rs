@@ -19,14 +19,14 @@ impl Aplicacion {
         })
     }
 
-    /// Consulta la biblioteca y entrega su conteo inicial a la vista.
+    /// Consulta la base de datos y entrega su conteo inicial a la vista.
     pub fn iniciar(&self) -> Result<(), ErrorModelo> {
-        let cantidad_rolas = self.operaciones.contar_canciones()?;
+        let rolas = self.operaciones.listar_canciones()?;
         let operaciones = Rc::clone(&self.operaciones);
-        self.vista.iniciar(cantidad_rolas, move |directorio| {
+        self.vista.iniciar(rolas, move |directorio| {
             operaciones
                 .minar(&directorio)
-                .and_then(|()| operaciones.contar_canciones())
+                .and_then(|()| operaciones.listar_canciones())
                 .map_err(|error| error.to_string())
         });
         Ok(())
