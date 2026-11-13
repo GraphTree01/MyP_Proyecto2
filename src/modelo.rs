@@ -2,6 +2,7 @@
 
 pub mod album;
 pub mod album_dao;
+pub mod compilador;
 pub mod error;
 pub mod group;
 pub mod importador;
