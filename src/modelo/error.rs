@@ -8,6 +8,7 @@ pub enum ErrorModelo {
     BaseDatos(rusqlite::Error),
     Recorrido(walkdir::Error),
     LecturaId3 { ruta: PathBuf, fuente: id3::Error },
+    ErrorCompilador(ErrorCompilador),
     RutaNoRepresentable(PathBuf),
     TituloNoDisponible(PathBuf),
 }
@@ -38,6 +39,7 @@ impl fmt::Display for ErrorModelo {
                     ruta.display()
                 )
             }
+            Self::ErrorCompilador(fuente) => write!(formatter, "{fuente}"),
             Self::RutaNoRepresentable(ruta) => write!(
                 formatter,
                 "La ruta '{}' no se puede representar como texto UTF-8",
@@ -89,6 +91,7 @@ impl Error for ErrorModelo {
             Self::BaseDatos(fuente) => Some(fuente),
             Self::Recorrido(fuente) => Some(fuente),
             Self::LecturaId3 { fuente, .. } => Some(fuente),
+            Self::ErrorCompilador(fuente) => Some(fuente),
             Self::RutaNoRepresentable(_) | Self::TituloNoDisponible(_) => None,
         }
     }
@@ -105,5 +108,11 @@ impl From<rusqlite::Error> for ErrorModelo {
 impl From<walkdir::Error> for ErrorModelo {
     fn from(fuente: walkdir::Error) -> Self {
         Self::Recorrido(fuente)
+    }
+}
+
+impl From<ErrorCompilador> for ErrorModelo {
+    fn from(fuente: ErrorCompilador) -> Self {
+        Self::ErrorCompilador(fuente)
     }
 }

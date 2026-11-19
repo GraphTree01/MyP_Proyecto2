@@ -5,6 +5,7 @@ use std::path::Path;
 
 use rusqlite::{Connection, params};
 
+use crate::modelo::compilador::ConsultaSql;
 use crate::modelo::error::ErrorModelo;
 use crate::modelo::rola::{Rola, Rolita};
 
@@ -78,5 +79,57 @@ impl RolaDao {
         })?;
 
         Ok(filas.collect::<Result<Vec<_>, _>>()?)
+    }
+
+    /// Ejecuta una consulta y devuelve las canciones que coiciden.
+    pub fn buscar(
+        &self,
+        conexion: &Connection,
+        consulta: &ConsultaSql,
+    ) -> Result<Vec<Rolita>, ErrorModelo> {
+        let mut entrada = conexion.prepare(consulta.sql())?;
+        let filas =
+            entrada.query_map(rusqlite::params_from_iter(consulta.parametros()), |fila| {
+                Ok(Rolita {
+                    titulo: fila.get(0)?,
+                    performer: fila.get(1)?,
+                    album: fila.get(2)?,
+                    genero: fila.get(3)?,
+                })
+            })?;
+
+        Ok(filas.collect::<Result<Vec<_>, _>>()?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::modelo::compilador::Compilador;
+
+    #[test]
+    fn test_buscar() {
+        let conexion = Connection::open_in_memory().unwrap();
+        conexion
+            .execute_batch(include_str!("../../rolas.sql"))
+            .unwrap();
+        conexion
+            .execute_batch(
+                "INSERT INTO performers (id_performer, id_type, name)
+                 VALUES (1, 2, 'Artista');
+                 INSERT INTO albums (id_album, path, name, year)
+                 VALUES (1, NULL, 'Álbum', NULL);
+                 INSERT INTO rolas (id_performer, id_album, path, title, year, genre)
+                 VALUES
+                    (1, 1, 'amor.mp3', 'Canción de amor', 2024, 'Rock'),
+                    (1, 1, 'otra.mp3', 'Otra canción', 2020, 'Pop');",
+            )
+            .unwrap();
+
+        let consulta = Compilador::compilar(r#"title contiene "amor""#).unwrap();
+        let resultados = RolaDao::nuevo().buscar(&conexion, &consulta).unwrap();
+
+        assert_eq!(resultados.len(), 1);
+        assert_eq!(resultados[0].titulo, "Canción de amor");
     }
 }

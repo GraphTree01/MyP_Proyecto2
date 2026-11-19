@@ -22,13 +22,22 @@ impl Aplicacion {
     /// Consulta la base de datos y entrega su conteo inicial a la vista.
     pub fn iniciar(&self) -> Result<(), ErrorModelo> {
         let rolas = self.operaciones.listar_canciones()?;
-        let operaciones = Rc::clone(&self.operaciones);
-        self.vista.iniciar(rolas, move |directorio| {
-            operaciones
-                .minar(&directorio)
-                .and_then(|()| operaciones.listar_canciones())
-                .map_err(|error| error.to_string())
-        });
+        let busqueda = Rc::clone(&self.operaciones);
+        let minado = Rc::clone(&busqueda);
+        self.vista.iniciar(
+            rolas,
+            move |directorio| {
+                minado
+                    .minar(&directorio)
+                    .and_then(|()| minado.listar_canciones())
+                    .map_err(|error| error.to_string())
+            },
+            move |expresion| {
+                busqueda
+                    .buscar_canciones(&expresion)
+                    .map_err(|error| error.to_string())
+            },
+        );
         Ok(())
     }
 }

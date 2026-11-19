@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
+use crate::modelo::compilador::Compilador;
 use crate::modelo::error::ErrorModelo;
 use crate::modelo::importador::Importador;
 use crate::modelo::minero::Minero;
@@ -56,6 +57,16 @@ impl Operaciones {
     /// Devuelve una lista vacía si la base de datos no contiene canciones.
     pub fn listar_canciones(&self) -> Result<Vec<Rolita>, ErrorModelo> {
         self.rola_dao.listar(&self.conexion)
+    }
+
+    /// Busca canciones; una expresión vacía devuelve el listado completo.
+    pub fn buscar_canciones(&self, expresion: &str) -> Result<Vec<Rolita>, ErrorModelo> {
+        if expresion.trim().is_empty() {
+            return self.listar_canciones();
+        }
+
+        let consulta = Compilador::compilar(expresion)?;
+        self.rola_dao.buscar(&self.conexion, &consulta)
     }
 
     /// Devuelve la cantidad de canciones almacenadas en la base de datos.

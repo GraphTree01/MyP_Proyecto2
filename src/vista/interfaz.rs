@@ -1,7 +1,7 @@
 use crate::modelo::rola::Rolita;
 use gtk::prelude::*;
 use gtk::{
-    self, Application, ApplicationWindow, Box as GtkBox, Button, FileDialog, Grid, HeaderBar,
+    self, Application, ApplicationWindow, Box as GtkBox, Button, Entry, FileDialog, Grid, HeaderBar,
     Image, Label, Orientation, ScrolledWindow, Separator, ToggleButton,
 };
 use std::path::PathBuf;
@@ -22,19 +22,26 @@ impl Vista {
     }
 
     /// Inicia el ciclo de vida de la interfaz gráfica GTK.
-    pub fn iniciar<F>(&self, rolas: Vec<Rolita>, al_minar: F)
+    pub fn iniciar<F, B>(&self, rolas: Vec<Rolita>, al_minar: F, al_buscar: B)
     where
         F: Fn(PathBuf) -> Result<Vec<Rolita>, String> + Clone + 'static,
+        B: Fn(String) -> Result<Vec<Rolita>, String> + Clone + 'static,
     {
         self.aplicacion.connect_activate(move |application| {
-            Self::construir_ui(application, rolas.clone(), al_minar.clone())
+            Self::construir_ui(
+                application,
+                rolas.clone(),
+                al_minar.clone(),
+                al_buscar.clone(),
+            )
         });
         self.aplicacion.run();
     }
 
-    fn construir_ui<F>(application: &Application, rolas: Vec<Rolita>, al_minar: F)
+    fn construir_ui<F, B>(application: &Application, rolas: Vec<Rolita>, al_minar: F, al_buscar: B)
     where
         F: Fn(PathBuf) -> Result<Vec<Rolita>, String> + 'static,
+        B: Fn(String) -> Result<Vec<Rolita>, String> + 'static,
     {
         let contenido = GtkBox::new(Orientation::Horizontal, 0);
         let izquierda = Self::construir_panel_izquierdo();
@@ -56,6 +63,7 @@ impl Vista {
         header.pack_end(&Self::construir_botones_encabezado(
             &window,
             Rc::new(al_minar),
+            Rc::new(al_buscar),
             subtitulo,
             mensaje,
             tabla,
@@ -81,6 +89,7 @@ impl Vista {
     fn construir_botones_encabezado(
         window: &ApplicationWindow,
         al_minar: Rc<dyn Fn(PathBuf) -> Result<Vec<Rolita>, String>>,
+        al_buscar: Rc<dyn Fn(String) -> Result<Vec<Rolita>, String>>,
         subtitulo: Label,
         mensaje: Label,
         tabla: Grid,
@@ -103,12 +112,14 @@ impl Vista {
         botones_vista.append(&boton_tabla);
         botones_vista.append(&boton_alternativo);
 
-        let boton_buscar = Button::from_icon_name("system-search-symbolic");
-        boton_buscar.set_tooltip_text(Some("Buscar rolas (próximamente)"));
-        boton_buscar.set_sensitive(false);
-
         controles.append(&botones_vista);
-        controles.append(&boton_buscar);
+        let control_busqueda = Self::construir_boton_busqueda(
+            al_buscar,
+            subtitulo.clone(),
+            mensaje.clone(),
+            tabla.clone(),
+        );
+        controles.append(&control_busqueda);
 
         let boton_minar = Button::from_icon_name("folder-open-symbolic");
         boton_minar.set_tooltip_text(Some("Minar carpeta de música"));
@@ -117,6 +128,123 @@ impl Vista {
         Self::conectar_boton_minar(&boton_minar, window, al_minar, subtitulo, mensaje, tabla);
 
         controles
+    }
+
+    fn construir_boton_busqueda(
+        al_buscar: Rc<dyn Fn(String) -> Result<Vec<Rolita>, String>>,
+        subtitulo: Label,
+        mensaje: Label,
+        tabla: Grid,
+    ) -> GtkBox {
+        let boton = GtkBox::new(Orientation::Horizontal, 0);
+        let expandir_boton = Button::from_icon_name("system-search-symbolic");
+        expandir_boton.set_tooltip_text(Some("Buscar"));
+
+        let barra_busqueda = GtkBox::new(Orientation::Horizontal, 4);
+        let entrada = Entry::new();
+        entrada.set_placeholder_text(Some("Buscar (ej. title contiene \"love\")"));
+        entrada.set_width_chars(28);
+        let boton_ejecutar = Button::from_icon_name("system-search-symbolic");
+        boton_ejecutar.set_tooltip_text(Some("Buscar"));
+        let boton_cerrar = Button::from_icon_name("window-close-symbolic");
+        boton_cerrar.set_tooltip_text(Some("Cerrar"));
+
+        barra_busqueda.append(&entrada);
+        barra_busqueda.append(&boton_cerrar);
+        barra_busqueda.append(&boton_ejecutar);
+        boton.append(&expandir_boton);
+
+        let boton_abrir = boton.clone();
+        let barra_abrir = barra_busqueda.clone();
+        let boton_expandido = expandir_boton.clone();
+        let entrada_abrir = entrada.clone();
+        expandir_boton.connect_clicked(move |_| {
+            boton_abrir.remove(&boton_expandido);
+            boton_abrir.append(&barra_abrir);
+            entrada_abrir.grab_focus();
+        });
+
+        let buscar = Rc::clone(&al_buscar);
+        let entrada_buscar = entrada.clone();
+        let subtitulo_buscar = subtitulo.clone();
+        let mensaje_buscar = mensaje.clone();
+        let tabla_buscar = tabla.clone();
+        boton_ejecutar.connect_clicked(move |_| {
+            Self::ejecutar_busqueda(
+                entrada_buscar.text().to_string(),
+                &*buscar,
+                &subtitulo_buscar,
+                &mensaje_buscar,
+                &tabla_buscar,
+            );
+        });
+
+        let buscar_enter = Rc::clone(&al_buscar);
+        let subtitulo_enter = subtitulo.clone();
+        let mensaje_enter = mensaje.clone();
+        let tabla_enter = tabla.clone();
+        entrada.connect_activate(move |entrada| {
+            Self::ejecutar_busqueda(
+                entrada.text().to_string(),
+                &*buscar_enter,
+                &subtitulo_enter,
+                &mensaje_enter,
+                &tabla_enter,
+            );
+        });
+
+        let buscar_cerrar = Rc::clone(&al_buscar);
+        let subtitulo_cerrar = subtitulo;
+        let mensaje_cerrar = mensaje;
+        let tabla_cerrar = tabla;
+        let control_cerrar = boton.clone();
+        let barra_cerrar = barra_busqueda.clone();
+        let boton_abrir_cerrar = expandir_boton;
+        boton_cerrar.connect_clicked(move |_| {
+            if Self::ejecutar_busqueda(
+                String::new(),
+                &*buscar_cerrar,
+                &subtitulo_cerrar,
+                &mensaje_cerrar,
+                &tabla_cerrar,
+            ) {
+                entrada.set_text("");
+                control_cerrar.remove(&barra_cerrar);
+                control_cerrar.append(&boton_abrir_cerrar);
+                boton_abrir_cerrar.grab_focus();
+            }
+        });
+        boton
+    }
+
+    fn ejecutar_busqueda(
+        expresion: String,
+        al_buscar: &dyn Fn(String) -> Result<Vec<Rolita>, String>,
+        subtitulo: &Label,
+        mensaje: &Label,
+        tabla: &Grid,
+    ) -> bool {
+        match al_buscar(expresion.clone()) {
+            Ok(rolas) => {
+                actualizar_tabla(tabla, &rolas);
+                if expresion.trim().is_empty() {
+                    subtitulo.set_text(&format!("{} rolas", rolas.len()));
+                    mensaje.set_text("");
+                } else {
+                    subtitulo.set_text(&format!("{} resultados", rolas.len()));
+                    if rolas.is_empty() {
+                        mensaje.set_text("No se encontraron rolas.");
+                    } else {
+                        mensaje.set_text(&format!("{} rolas encontradas.", rolas.len()));
+                    }
+                }
+                true
+            }
+            Err(error) => {
+                mensaje.set_text(&format!("Error en la búsqueda: {error}"));
+                false
+            }
+        }
     }
 
     fn conectar_boton_minar(
