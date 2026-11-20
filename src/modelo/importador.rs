@@ -44,8 +44,39 @@ impl Importador {
     pub fn procesar(&mut self, metadatos: Metadatos) -> Result<bool, ErrorModelo> {
         let transaccion = self.conexion.transaction()?;
 
+        let directorio_album = metadatos
+            .path()
+            .parent()
+            .filter(|directorio| !directorio.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        let album_nombre = metadatos
+            .album()
+            .or_else(|| {
+                directorio_album
+                    .file_name()
+                    .and_then(|nombre| nombre.to_str())
+            })
+            .unwrap_or("Unknown");
+        let id_album = match self
+            .album_dao
+            .buscar_id_por_directorio(&transaccion, directorio_album)?
+        {
+            Some(id) => id,
+            None => self.album_dao.insertar(
+                &transaccion,
+                &Album {
+                    id_album: None,
+                    path: Some(directorio_album.to_path_buf()),
+                    name: album_nombre.to_owned(),
+                    year: metadatos.year(),
+                },
+            )?,
+        };
+
         if self.rola_dao.existe(&transaccion, metadatos.path())? {
-            transaccion.rollback()?;
+            self.rola_dao
+                .asignar_album_por_ruta(&transaccion, metadatos.path(), id_album)?;
+            transaccion.commit()?;
             return Ok(false);
         }
 
@@ -73,23 +104,6 @@ impl Importador {
                     id_performer: None,
                     id_type: Type::Unknown,
                     name: performer_nombre.to_owned(),
-                },
-            )?,
-        };
-
-        let album_nombre = metadatos.album().unwrap_or("Unknown");
-        let id_album = match self
-            .album_dao
-            .buscar_id_por_nombre(&transaccion, album_nombre)?
-        {
-            Some(id) => id,
-            None => self.album_dao.insertar(
-                &transaccion,
-                &Album {
-                    id_album: None,
-                    path: None,
-                    name: album_nombre.to_owned(),
-                    year: metadatos.year(),
                 },
             )?,
         };

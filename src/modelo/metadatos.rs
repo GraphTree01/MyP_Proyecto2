@@ -2,7 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
-use id3::{Tag, TagLike};
+use id3::frame::PictureType;
+use id3::{ErrorKind, Tag, TagLike};
 
 use crate::modelo::error::ErrorModelo;
 
@@ -19,6 +20,7 @@ pub struct Metadatos {
     genre: Option<String>,
     year: Option<i32>,
     track: Option<u32>,
+    caratula: Option<Vec<u8>>,
 }
 
 impl Metadatos {
@@ -37,6 +39,7 @@ impl Metadatos {
         let genre = etiqueta.genre().map(String::from);
         let year = etiqueta.year();
         let track = etiqueta.track();
+        let caratula = extraer_caratula(&etiqueta);
 
         Ok(Self {
             path: path.to_path_buf(),
@@ -46,7 +49,35 @@ impl Metadatos {
             genre,
             year,
             track,
+            caratula,
         })
+    }
+
+    /// Lee la portada de un archivo para incluirla en los resultados de la vista.
+    ///
+    /// Si el archivo ya no existe o no tiene etiqueta ID3, no hay portada
+    /// disponible.
+    pub fn leer_caratula(path: &Path) -> Result<Option<Vec<u8>>, ErrorModelo> {
+        let etiqueta = match Tag::read_from_path(path) {
+            Ok(etiqueta) => etiqueta,
+            Err(error) if matches!(&error.kind, ErrorKind::NoTag) => return Ok(None),
+            Err(error)
+                if matches!(
+                    &error.kind,
+                    ErrorKind::Io(fuente)
+                        if fuente.kind() == std::io::ErrorKind::NotFound
+                ) =>
+            {
+                return Ok(None);
+            }
+            Err(fuente) => {
+                return Err(ErrorModelo::LecturaId3 {
+                    ruta: path.to_path_buf(),
+                    fuente,
+                });
+            }
+        };
+        Ok(extraer_caratula(&etiqueta))
     }
 
     //Getters de la clase Metadatos
@@ -85,4 +116,18 @@ impl Metadatos {
     pub fn track(&self) -> Option<u32> {
         self.track
     }
+
+    /// Devuelve los bytes de la portada ID3, si está disponible.
+    pub fn caratula(&self) -> Option<&[u8]> {
+        self.caratula.as_deref()
+    }
+}
+
+fn extraer_caratula(etiqueta: &Tag) -> Option<Vec<u8>> {
+    etiqueta
+        .pictures()
+        .filter(|imagen| !imagen.data.is_empty())
+        .find(|imagen| imagen.picture_type == PictureType::CoverFront)
+        .or_else(|| etiqueta.pictures().find(|imagen| !imagen.data.is_empty()))
+        .map(|imagen| imagen.data.clone())
 }

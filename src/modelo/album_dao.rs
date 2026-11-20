@@ -32,9 +32,35 @@ impl AlbumDao {
             .optional()?)
     }
 
+    /// Busca el álbum asociado a un directorio exacto.
+    pub fn buscar_id_por_directorio(
+        &self,
+        conexion: &Connection,
+        directorio: &Path,
+    ) -> Result<Option<i64>, ErrorModelo> {
+        let directorio = directorio
+            .to_str()
+            .ok_or_else(|| ErrorModelo::RutaNoRepresentable(directorio.to_path_buf()))?;
+
+        Ok(conexion
+            .query_row(
+                "SELECT id_album FROM albums WHERE path = ?1 LIMIT 1",
+                [directorio],
+                |fila| fila.get(0),
+            )
+            .optional()?)
+    }
+
     /// Inserta un álbum y devuelve el identificador generado.
     pub fn insertar(&self, conexion: &Connection, album: &Album) -> Result<i64, ErrorModelo> {
-        let ruta = album.path.as_deref().and_then(Path::to_str);
+        let ruta = album
+            .path
+            .as_deref()
+            .map(|ruta| {
+                ruta.to_str()
+                    .ok_or_else(|| ErrorModelo::RutaNoRepresentable(ruta.to_path_buf()))
+            })
+            .transpose()?;
         conexion.execute(
             "INSERT INTO albums (path, name, year) VALUES (?1, ?2, ?3)",
             params![ruta, album.name, album.year],

@@ -7,7 +7,10 @@ use rusqlite::{Connection, params};
 
 use crate::modelo::compilador::ConsultaSql;
 use crate::modelo::error::ErrorModelo;
+use crate::modelo::metadatos::Metadatos;
 use crate::modelo::rola::{Rola, Rolita};
+
+type DatosFila = (String, String, String, Option<String>, Option<String>);
 
 /// Acceso a datos de la tabla `rolas`.
 pub struct RolaDao;
@@ -29,6 +32,24 @@ impl RolaDao {
             params![ruta],
             |fila| fila.get(0),
         )?)
+    }
+
+    /// Actualiza el álbum asociado a una pista ya almacenada.
+    pub fn asignar_album_por_ruta(
+        &self,
+        conexion: &Connection,
+        ruta: &Path,
+        id_album: i64,
+    ) -> Result<(), ErrorModelo> {
+        let ruta = ruta
+            .to_str()
+            .ok_or_else(|| ErrorModelo::RutaNoRepresentable(ruta.to_path_buf()))?;
+
+        conexion.execute(
+            "UPDATE rolas SET id_album = ?1 WHERE path = ?2",
+            params![id_album, ruta],
+        )?;
+        Ok(())
     }
 
     /// Inserta una canción y devuelve el identificador generado.
@@ -59,26 +80,28 @@ impl RolaDao {
         Ok(conexion.query_row("SELECT COUNT(*) FROM rolas", [], |fila| fila.get(0))?)
     }
 
-    /// Devuelve las canciones e identificadores de la base de datos.
+    /// Devuelve los datos de las canciones sin leer carátulas.
     pub fn listar(&self, conexion: &Connection) -> Result<Vec<Rolita>, ErrorModelo> {
-        let mut consulta = conexion.prepare(
-            "SELECT r.title, p.name, a.name, r.genre
+        self.listar_con_caratulas(conexion, false)
+    }
+
+    /// Devuelve los datos de las canciones y carga las carátulas si se solicitan.
+    pub fn listar_con_caratulas(
+        &self,
+        conexion: &Connection,
+        incluir: bool,
+    ) -> Result<Vec<Rolita>, ErrorModelo> {
+        let ruta = if incluir { "r.path" } else { "NULL" };
+        let sql = format!(
+            "SELECT r.title, p.name, a.name, r.genre, {ruta}
              FROM rolas r
              JOIN performers p ON p.id_performer = r.id_performer
              JOIN albums a ON a.id_album = r.id_album
-             ORDER BY r.title, p.name, a.name",
-        )?;
-
-        let filas = consulta.query_map([], |fila| {
-            Ok(Rolita {
-                titulo: fila.get(0)?,
-                performer: fila.get(1)?,
-                album: fila.get(2)?,
-                genero: fila.get(3)?,
-            })
-        })?;
-
-        Ok(filas.collect::<Result<Vec<_>, _>>()?)
+             ORDER BY r.title, p.name, a.name"
+        );
+        let mut consulta = conexion.prepare(&sql)?;
+        let filas = consulta.query_map([], fila_a_datos)?;
+        self.construir_rolitas(filas, incluir)
     }
 
     /// Ejecuta una consulta y devuelve las canciones que coiciden.
@@ -87,19 +110,68 @@ impl RolaDao {
         conexion: &Connection,
         consulta: &ConsultaSql,
     ) -> Result<Vec<Rolita>, ErrorModelo> {
+        self.buscar_con_caratulas(conexion, consulta, false)
+    }
+
+    /// Ejecuta una consulta y carga carátulas solo si se solicitan.
+    pub fn buscar_con_caratulas(
+        &self,
+        conexion: &Connection,
+        consulta: &ConsultaSql,
+        incluir: bool,
+    ) -> Result<Vec<Rolita>, ErrorModelo> {
         let mut entrada = conexion.prepare(consulta.sql())?;
-        let filas =
-            entrada.query_map(rusqlite::params_from_iter(consulta.parametros()), |fila| {
-                Ok(Rolita {
-                    titulo: fila.get(0)?,
-                    performer: fila.get(1)?,
-                    album: fila.get(2)?,
-                    genero: fila.get(3)?,
-                })
+        let filas = entrada
+            .query_map(rusqlite::params_from_iter(consulta.parametros()), |fila| {
+                fila_a_datos(fila)
             })?;
 
-        Ok(filas.collect::<Result<Vec<_>, _>>()?)
+        self.construir_rolitas(filas, incluir)
     }
+
+    fn construir_rolitas(
+        &self,
+        filas: rusqlite::MappedRows<
+            '_,
+            impl FnMut(
+                &rusqlite::Row<'_>,
+            )
+                -> rusqlite::Result<(String, String, String, Option<String>, Option<String>)>,
+        >,
+        incluir: bool,
+    ) -> Result<Vec<Rolita>, ErrorModelo> {
+        filas
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .map(|(titulo, performer, album, genero, ruta)| {
+                Ok(Rolita {
+                    titulo,
+                    performer,
+                    album,
+                    genero,
+                    caratula: if incluir {
+                        ruta.as_deref()
+                            .map(Path::new)
+                            .map(Metadatos::leer_caratula)
+                            .transpose()?
+                            .flatten()
+                    } else {
+                        None
+                    },
+                })
+            })
+            .collect()
+    }
+}
+
+fn fila_a_datos(fila: &rusqlite::Row<'_>) -> rusqlite::Result<DatosFila> {
+    Ok((
+        fila.get(0)?,
+        fila.get(1)?,
+        fila.get(2)?,
+        fila.get(3)?,
+        fila.get(4)?,
+    ))
 }
 
 #[cfg(test)]

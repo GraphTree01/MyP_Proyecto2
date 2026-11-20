@@ -53,11 +53,20 @@ impl Compilador {
 
     /// Valida los campos, operadores y valores, y genera una consulta sql.
     pub fn analizar_semantica(expresion: Expresion) -> Result<ConsultaSql, ErrorCompilador> {
-        let (condicion, parametros) = semantica::compilar(&expresion.raiz)?;
+        Self::compilar_raiz(&expresion.raiz, false)
+    }
+
+    fn compilar_raiz(raiz: &Nodo, incluir_ruta: bool) -> Result<ConsultaSql, ErrorCompilador> {
+        let (condicion, parametros) = semantica::compilar(raiz)?;
+        let columnas = if incluir_ruta {
+            ", NULL, r.path"
+        } else {
+            ", r.genre, NULL"
+        };
 
         Ok(ConsultaSql {
             sql: format!(
-                "SELECT r.title, p.name, a.name, r.genre
+                "SELECT r.title, p.name, a.name{columnas}
                  FROM rolas r
                  JOIN performers p ON p.id_performer = r.id_performer
                  JOIN albums a ON a.id_album = r.id_album
@@ -71,6 +80,13 @@ impl Compilador {
     /// Ejecuta el análisis sintáctico y semántico de principio a fin.
     pub fn compilar(texto: &str) -> Result<ConsultaSql, ErrorCompilador> {
         Self::analizar_semantica(Self::analizar_sintaxis(texto)?)
+    }
+
+    /// Compila una búsqueda incluyendo la ruta de cada pista para cargar sus
+    /// carátulas cuando la vista de recuadros las necesita.
+    pub fn compilar_con_ruta(texto: &str) -> Result<ConsultaSql, ErrorCompilador> {
+        let expresion = Self::analizar_sintaxis(texto)?;
+        Self::compilar_raiz(&expresion.raiz, true)
     }
 }
 

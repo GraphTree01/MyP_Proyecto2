@@ -56,17 +56,40 @@ impl Operaciones {
     ///
     /// Devuelve una lista vacía si la base de datos no contiene canciones.
     pub fn listar_canciones(&self) -> Result<Vec<Rolita>, ErrorModelo> {
-        self.rola_dao.listar(&self.conexion)
+        self.listar_canciones_con_caratulas(false)
+    }
+
+    /// Lista las canciones y carga sus carátulas solo si se solicitan.
+    pub fn listar_canciones_con_caratulas(
+        &self,
+        incluir_caratulas: bool,
+    ) -> Result<Vec<Rolita>, ErrorModelo> {
+        self.rola_dao
+            .listar_con_caratulas(&self.conexion, incluir_caratulas)
     }
 
     /// Busca canciones; una expresión vacía devuelve el listado completo.
     pub fn buscar_canciones(&self, expresion: &str) -> Result<Vec<Rolita>, ErrorModelo> {
+        self.buscar_canciones_con_caratulas(expresion, false)
+    }
+
+    /// Busca canciones y carga carátulas solo si se solicitan.
+    pub fn buscar_canciones_con_caratulas(
+        &self,
+        expresion: &str,
+        incluir_caratulas: bool,
+    ) -> Result<Vec<Rolita>, ErrorModelo> {
         if expresion.trim().is_empty() {
-            return self.listar_canciones();
+            return self.listar_canciones_con_caratulas(incluir_caratulas);
         }
 
-        let consulta = Compilador::compilar(expresion)?;
-        self.rola_dao.buscar(&self.conexion, &consulta)
+        let consulta = if incluir_caratulas {
+            Compilador::compilar_con_ruta(expresion)?
+        } else {
+            Compilador::compilar(expresion)?
+        };
+        self.rola_dao
+            .buscar_con_caratulas(&self.conexion, &consulta, incluir_caratulas)
     }
 
     /// Devuelve la cantidad de canciones almacenadas en la base de datos.

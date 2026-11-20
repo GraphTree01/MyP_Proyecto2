@@ -31,4 +31,6 @@ pub struct Rolita {
     pub album: String,
     /// Género musical, si está disponible.
     pub genero: Option<String>,
+    /// Imagen de la canción, si existe.
+    pub caratula: Option<Vec<u8>>,
 }

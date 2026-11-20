@@ -26,15 +26,10 @@ impl Aplicacion {
         let minado = Rc::clone(&busqueda);
         self.vista.iniciar(
             rolas,
-            move |directorio| {
-                minado
-                    .minar(&directorio)
-                    .and_then(|()| minado.listar_canciones())
-                    .map_err(|error| error.to_string())
-            },
-            move |expresion| {
+            move |directorio| minado.minar(&directorio).map_err(|error| error.to_string()),
+            move |expresion, incluir_caratulas| {
                 busqueda
-                    .buscar_canciones(&expresion)
+                    .buscar_canciones_con_caratulas(&expresion, incluir_caratulas)
                     .map_err(|error| error.to_string())
             },
         );
