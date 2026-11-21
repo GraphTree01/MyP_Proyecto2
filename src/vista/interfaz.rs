@@ -1,8 +1,9 @@
+use crate::modelo::metadatos::Metadatos;
 use crate::modelo::rola::Rolita;
 use gtk::prelude::*;
 use gtk::{
-    self, Application, ApplicationWindow, Box as GtkBox, Button, Entry, FileDialog, FlowBox, Grid,
-    HeaderBar, Image, Label, Orientation, ScrolledWindow, Separator, Stack, ToggleButton,
+    self, Application, ApplicationWindow, Box as GtkBox, Button, Entry, FileDialog, FlowBox, Frame,
+    Grid, HeaderBar, Image, Label, Orientation, ScrolledWindow, Separator, Stack, ToggleButton,
 };
 use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
@@ -17,8 +18,72 @@ struct PanelResultados {
     recuadros: FlowBox,
     subtitulo: Label,
     mensaje: Label,
+    detalle: PanelSeleccion,
     en_recuadros: Rc<Cell<bool>>,
     expresion_actual: Rc<RefCell<String>>,
+    ruta_seleccionada: Rc<RefCell<Option<PathBuf>>>,
+    boton_seleccionado: Rc<RefCell<Option<Button>>>,
+}
+
+#[derive(Clone)]
+struct PanelSeleccion {
+    caratula: Image,
+    album: Label,
+    performer: Label,
+    titulo: Label,
+    mensaje: Label,
+}
+
+impl PanelSeleccion {
+    fn mostrar(&self, rola: &Rolita) {
+        let caratula = match &rola.caratula {
+            Some(caratula) => Ok(Some(caratula.clone())),
+            None => Metadatos::leer_caratula(&rola.path),
+        };
+        match caratula {
+            Ok(Some(bytes)) => {
+                let bytes = gtk::glib::Bytes::from_owned(bytes);
+                match gtk::gdk::Texture::from_bytes(&bytes) {
+                    Ok(textura) => {
+                        self.caratula.set_paintable(Some(&textura));
+                        self.mensaje.set_text("");
+                    }
+                    Err(error) => {
+                        self.mostrar_caratula_generica();
+                        self.mensaje
+                            .set_text(&format!("No se pudo mostrar la carátula: {error}"));
+                    }
+                }
+            }
+            Ok(None) => {
+                self.mostrar_caratula_generica();
+                self.mensaje.set_text("");
+            }
+            Err(error) => {
+                self.mostrar_caratula_generica();
+                self.mensaje
+                    .set_text(&format!("No se pudo leer la carátula: {error}"));
+            }
+        }
+
+        self.album.set_text(&rola.album);
+        self.performer.set_text(&rola.performer);
+        self.titulo.set_text(&rola.titulo);
+    }
+
+    fn limpiar(&self) {
+        self.mostrar_caratula_generica();
+        self.album.set_text("Álbum");
+        self.performer.set_text("Intérprete");
+        self.titulo.set_text("Canción");
+        self.mensaje.set_text("Selecciona una rola");
+    }
+
+    fn mostrar_caratula_generica(&self) {
+        self.caratula.set_paintable(None::<&gtk::gdk::Paintable>);
+        self.caratula
+            .set_icon_name(Some("audio-x-generic-symbolic"));
+    }
 }
 
 impl PanelResultados {
@@ -30,11 +95,18 @@ impl PanelResultados {
         let incluir_caratulas = self.en_recuadros.get();
         match al_buscar(expresion.clone(), incluir_caratulas) {
             Ok(rolas) => {
-                if incluir_caratulas {
-                    actualizar_recuadros(&self.recuadros, &rolas);
-                } else {
-                    actualizar_tabla(&self.tabla, &rolas);
+                let seleccion = self.ruta_seleccionada.borrow().clone();
+                if let Some(rola) = seleccion
+                    .as_ref()
+                    .and_then(|ruta| rolas.iter().find(|rola| &rola.path == ruta))
+                {
+                    self.detalle.mostrar(rola);
+                } else if seleccion.is_some() {
+                    *self.ruta_seleccionada.borrow_mut() = None;
+                    self.boton_seleccionado.borrow_mut().take();
+                    self.detalle.limpiar();
                 }
+                self.actualizar_vista(&rolas);
                 *self.expresion_actual.borrow_mut() = expresion.clone();
                 if expresion.trim().is_empty() {
                     self.subtitulo.set_text(&format!("{} rolas", rolas.len()));
@@ -56,6 +128,29 @@ impl PanelResultados {
                     .set_text(&format!("Error en la búsqueda: {error}"));
                 false
             }
+        }
+    }
+
+    fn seleccionar(&self, rola: &Rolita, boton: &Button) {
+        let anterior = self.boton_seleccionado.borrow_mut().take();
+        if let Some(anterior) = anterior {
+            anterior.remove_css_class("selected");
+        }
+        boton.add_css_class("selected");
+        *self.boton_seleccionado.borrow_mut() = Some(boton.clone());
+        *self.ruta_seleccionada.borrow_mut() = Some(rola.path.clone());
+        self.detalle.mostrar(rola);
+    }
+
+    fn actualizar_vista(&self, rolas: &[Rolita]) {
+        let anterior = self.boton_seleccionado.borrow_mut().take();
+        if let Some(anterior) = anterior {
+            anterior.remove_css_class("selected");
+        }
+        if self.en_recuadros.get() {
+            actualizar_recuadros(&self.recuadros, rolas, self);
+        } else {
+            actualizar_tabla(&self.tabla, rolas, self);
         }
     }
 }
@@ -95,8 +190,8 @@ impl Vista {
         B: Fn(String, bool) -> Result<Vec<Rolita>, String> + 'static,
     {
         let contenido = GtkBox::new(Orientation::Horizontal, 0);
-        let izquierda = Self::construir_panel_izquierdo();
-        let (derecha, vistas, tabla, recuadros, mensaje) = Self::construir_panel_derecho(&rolas);
+        let (izquierda, detalle) = Self::construir_panel_izquierdo();
+        let (derecha, vistas, tabla, recuadros, mensaje) = Self::construir_panel_derecho();
         let separador = Separator::new(Orientation::Vertical);
 
         contenido.append(&izquierda);
@@ -117,9 +212,13 @@ impl Vista {
             recuadros,
             subtitulo,
             mensaje,
+            detalle,
             en_recuadros: Rc::new(Cell::new(false)),
             expresion_actual: Rc::new(RefCell::new(String::new())),
+            ruta_seleccionada: Rc::new(RefCell::new(None)),
+            boton_seleccionado: Rc::new(RefCell::new(None)),
         };
+        resultados.actualizar_vista(&rolas);
         header.pack_end(&Self::construir_botones_encabezado(
             &window,
             Rc::new(al_minar),
@@ -274,8 +373,8 @@ impl Vista {
                 let expresion = resultados.expresion_actual.borrow().clone();
                 if !resultados.ejecutar_busqueda(expresion, &*buscar) {
                     resultados.en_recuadros.set(!modo_recuadros);
-                    tabla.set_active(modo_recuadros);
-                    recuadros.set_active(!modo_recuadros);
+                    tabla.set_active(!modo_recuadros);
+                    recuadros.set_active(modo_recuadros);
                     resultados.vistas.set_visible_child_name(if modo_recuadros {
                         "tabla"
                     } else {
@@ -337,17 +436,78 @@ impl Vista {
         });
     }
 
-    fn construir_panel_izquierdo() -> GtkBox {
+    fn construir_panel_izquierdo() -> (GtkBox, PanelSeleccion) {
         let panel = GtkBox::new(Orientation::Vertical, 10);
-        panel.set_size_request(260, -1);
+        panel.set_size_request(288, -1);
+        panel.set_hexpand(false);
+        panel.set_halign(gtk::Align::Fill);
         panel.set_margin_start(16);
         panel.set_margin_end(16);
         panel.set_margin_top(16);
-        panel.append(&Label::new(Some("Panel izquierdo")));
-        panel
+        panel.set_margin_bottom(16);
+
+        let caratula = Image::from_icon_name("audio-x-generic-symbolic");
+        caratula.set_pixel_size(220);
+        caratula.set_size_request(220, 220);
+        caratula.set_halign(gtk::Align::Center);
+        caratula.set_valign(gtk::Align::Center);
+        caratula.set_hexpand(false);
+        caratula.set_vexpand(false);
+        let espacio_caratula = Frame::new(None);
+        espacio_caratula.set_size_request(220, 220);
+        espacio_caratula.set_halign(gtk::Align::Center);
+        espacio_caratula.set_margin_top(24);
+        espacio_caratula.set_margin_bottom(12);
+        espacio_caratula.set_child(Some(&caratula));
+        panel.append(&espacio_caratula);
+
+        let detalles = Grid::new();
+        detalles.set_column_homogeneous(true);
+        detalles.set_row_spacing(0);
+        detalles.add_css_class("view");
+        let titulo = Self::construir_fila_detalle("audio-x-generic-symbolic", "Canción");
+        let performer = Self::construir_fila_detalle("system-users-symbolic", "Intérprete");
+        let album = Self::construir_fila_detalle("media-optical-symbolic", "Álbum");
+        detalles.attach(&titulo.0, 0, 0, 1, 1);
+        detalles.attach(&Separator::new(Orientation::Horizontal), 0, 1, 1, 1);
+        detalles.attach(&performer.0, 0, 2, 1, 1);
+        detalles.attach(&Separator::new(Orientation::Horizontal), 0, 3, 1, 1);
+        detalles.attach(&album.0, 0, 4, 1, 1);
+        panel.append(&detalles);
+
+        let mensaje = Label::new(Some("Selecciona una rola"));
+        mensaje.set_wrap(true);
+        panel.append(&mensaje);
+
+        (
+            panel,
+            PanelSeleccion {
+                caratula,
+                album: album.1,
+                performer: performer.1,
+                titulo: titulo.1,
+                mensaje,
+            },
+        )
     }
 
-    fn construir_panel_derecho(rolas: &[Rolita]) -> (GtkBox, Stack, Grid, FlowBox, Label) {
+    fn construir_fila_detalle(icono: &str, texto: &str) -> (GtkBox, Label) {
+        let fila = GtkBox::new(Orientation::Horizontal, 12);
+        fila.set_margin_start(12);
+        fila.set_margin_end(12);
+        fila.set_margin_top(8);
+        fila.set_margin_bottom(8);
+        let imagen = Image::from_icon_name(icono);
+        let etiqueta = Label::new(Some(texto));
+        etiqueta.set_xalign(0.0);
+        etiqueta.set_hexpand(true);
+        etiqueta.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        fila.append(&imagen);
+        fila.append(&etiqueta);
+        (fila, etiqueta)
+    }
+
+    fn construir_panel_derecho() -> (GtkBox, Stack, Grid, FlowBox, Label) {
         let panel = GtkBox::new(Orientation::Vertical, 0);
         panel.set_hexpand(true);
         panel.set_vexpand(true);
@@ -355,7 +515,7 @@ impl Vista {
         panel.set_margin_end(16);
         panel.set_margin_top(12);
         panel.set_margin_bottom(12);
-        let (tabla_desplazable, tabla) = Self::construir_tabla_canciones(rolas);
+        let (tabla_desplazable, tabla) = Self::construir_tabla_canciones();
         let vistas = Stack::new();
         vistas.add_named(&tabla_desplazable, Some("tabla"));
         let (recuadros_desplazables, recuadros) = Self::construir_vista_recuadros();
@@ -370,13 +530,11 @@ impl Vista {
         (panel, vistas, tabla, recuadros, mensaje)
     }
 
-    fn construir_tabla_canciones(rolas: &[Rolita]) -> (ScrolledWindow, Grid) {
+    fn construir_tabla_canciones() -> (ScrolledWindow, Grid) {
         let tabla = Grid::new();
         tabla.set_column_spacing(16);
         tabla.set_row_spacing(0);
         tabla.add_css_class("view");
-
-        actualizar_tabla(&tabla, rolas);
 
         let desplazamiento = ScrolledWindow::builder()
             .child(&tabla)
@@ -408,7 +566,7 @@ impl Vista {
     }
 }
 
-fn actualizar_tabla(tabla: &Grid, rolas: &[Rolita]) {
+fn actualizar_tabla(tabla: &Grid, rolas: &[Rolita], resultados: &PanelResultados) {
     while let Some(hijo) = tabla.first_child() {
         tabla.remove(&hijo);
     }
@@ -420,12 +578,34 @@ fn actualizar_tabla(tabla: &Grid, rolas: &[Rolita]) {
     let separador = Separator::new(Orientation::Horizontal);
     tabla.attach(&separador, 0, 1, 4, 1);
 
+    let seleccionada = resultados.ruta_seleccionada.borrow().clone();
     for (indice, rola) in rolas.iter().enumerate() {
         let fila = (indice as i32) * 2 + 2;
-        agregar_celda(tabla, &rola.titulo, 0, fila, false);
-        agregar_celda(tabla, &rola.performer, 1, fila, false);
-        agregar_celda(tabla, &rola.album, 2, fila, false);
-        agregar_celda(tabla, rola.genero.as_deref().unwrap_or("—"), 3, fila, false);
+        let contenido = Grid::new();
+        contenido.set_column_spacing(16);
+        contenido.set_hexpand(true);
+        agregar_celda(&contenido, &rola.titulo, 0, 0, false);
+        agregar_celda(&contenido, &rola.performer, 1, 0, false);
+        agregar_celda(&contenido, &rola.album, 2, 0, false);
+        agregar_celda(
+            &contenido,
+            rola.genero.as_deref().unwrap_or("—"),
+            3,
+            0,
+            false,
+        );
+        let boton = Button::new();
+        boton.set_child(Some(&contenido));
+        boton.set_hexpand(true);
+        boton.add_css_class("flat");
+        if seleccionada.as_ref() == Some(&rola.path) {
+            boton.add_css_class("selected");
+            *resultados.boton_seleccionado.borrow_mut() = Some(boton.clone());
+        }
+        let resultados_boton = resultados.clone();
+        let rola_boton = rola.clone();
+        boton.connect_clicked(move |boton| resultados_boton.seleccionar(&rola_boton, boton));
+        tabla.attach(&boton, 0, fila, 4, 1);
 
         if indice + 1 < rolas.len() {
             let separador = Separator::new(Orientation::Horizontal);
@@ -434,11 +614,12 @@ fn actualizar_tabla(tabla: &Grid, rolas: &[Rolita]) {
     }
 }
 
-fn actualizar_recuadros(recuadros: &FlowBox, rolas: &[Rolita]) {
+fn actualizar_recuadros(recuadros: &FlowBox, rolas: &[Rolita], resultados: &PanelResultados) {
     while let Some(hijo) = recuadros.first_child() {
         recuadros.remove(&hijo);
     }
 
+    let seleccionada = resultados.ruta_seleccionada.borrow().clone();
     for rola in rolas {
         let recuadro = GtkBox::new(Orientation::Vertical, 6);
         recuadro.set_size_request(190, -1);
@@ -463,7 +644,17 @@ fn actualizar_recuadros(recuadros: &FlowBox, rolas: &[Rolita]) {
         recuadro.append(&album);
         recuadro.append(&titulo);
         recuadro.append(&performer);
-        recuadros.append(&recuadro);
+        let boton = Button::new();
+        boton.set_child(Some(&recuadro));
+        boton.add_css_class("flat");
+        if seleccionada.as_ref() == Some(&rola.path) {
+            boton.add_css_class("selected");
+            *resultados.boton_seleccionado.borrow_mut() = Some(boton.clone());
+        }
+        let resultados_boton = resultados.clone();
+        let rola_boton = rola.clone();
+        boton.connect_clicked(move |boton| resultados_boton.seleccionar(&rola_boton, boton));
+        recuadros.append(&boton);
     }
 }
 

@@ -61,7 +61,7 @@ impl Compilador {
         let columnas = if incluir_ruta {
             ", NULL, r.path"
         } else {
-            ", r.genre, NULL"
+            ", r.genre, r.path"
         };
 
         Ok(ConsultaSql {

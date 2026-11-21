@@ -143,7 +143,7 @@ fn compilar_nodo(nodo: &Nodo, parametros: &mut Vec<Value>) -> Result<String, Err
     }
 }
 
-/// Comprueba si la busqueda cae en los límites validos de los campos 
+/// Comprueba si la busqueda cae en los límites validos de los campos
 // 'year' y 'track'.
 fn validar_rango(campo: &Campo, valor: i64) -> Result<(), ErrorCompilador> {
     match campo {
@@ -159,7 +159,7 @@ fn validar_rango(campo: &Campo, valor: i64) -> Result<(), ErrorCompilador> {
     }
 }
 
-/// Obliga a que carácteres especiales dados por el usuario aparezcan 
+/// Obliga a que carácteres especiales dados por el usuario aparezcan
 // literalmente y Rust no los interprete como comandos especiales.
 fn formatear_patron(texto: &str) -> String {
     let scape_text = texto

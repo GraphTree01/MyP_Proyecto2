@@ -10,7 +10,7 @@ use crate::modelo::error::ErrorModelo;
 use crate::modelo::metadatos::Metadatos;
 use crate::modelo::rola::{Rola, Rolita};
 
-type DatosFila = (String, String, String, Option<String>, Option<String>);
+type DatosFila = (String, String, String, Option<String>, String);
 
 /// Acceso a datos de la tabla `rolas`.
 pub struct RolaDao;
@@ -91,9 +91,13 @@ impl RolaDao {
         conexion: &Connection,
         incluir: bool,
     ) -> Result<Vec<Rolita>, ErrorModelo> {
-        let ruta = if incluir { "r.path" } else { "NULL" };
+        let columnas = if incluir {
+            "NULL, r.path"
+        } else {
+            "r.genre, r.path"
+        };
         let sql = format!(
-            "SELECT r.title, p.name, a.name, r.genre, {ruta}
+            "SELECT r.title, p.name, a.name, {columnas}
              FROM rolas r
              JOIN performers p ON p.id_performer = r.id_performer
              JOIN albums a ON a.id_album = r.id_album
@@ -133,10 +137,7 @@ impl RolaDao {
         &self,
         filas: rusqlite::MappedRows<
             '_,
-            impl FnMut(
-                &rusqlite::Row<'_>,
-            )
-                -> rusqlite::Result<(String, String, String, Option<String>, Option<String>)>,
+            impl FnMut(&rusqlite::Row<'_>) -> rusqlite::Result<DatosFila>,
         >,
         incluir: bool,
     ) -> Result<Vec<Rolita>, ErrorModelo> {
@@ -145,16 +146,13 @@ impl RolaDao {
             .into_iter()
             .map(|(titulo, performer, album, genero, ruta)| {
                 Ok(Rolita {
+                    path: ruta.clone().into(),
                     titulo,
                     performer,
                     album,
                     genero,
                     caratula: if incluir {
-                        ruta.as_deref()
-                            .map(Path::new)
-                            .map(Metadatos::leer_caratula)
-                            .transpose()?
-                            .flatten()
+                        Metadatos::leer_caratula(Path::new(&ruta))?
                     } else {
                         None
                     },
