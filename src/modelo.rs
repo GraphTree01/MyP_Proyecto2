@@ -4,6 +4,7 @@ pub mod album;
 pub mod album_dao;
 pub mod compilador;
 pub mod error;
+pub mod fecha;
 pub mod group;
 pub mod importador;
 pub mod metadatos;

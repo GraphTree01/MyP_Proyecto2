@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 gtk = { package = "gtk4", version = "0.10", features = ["v4_10"] }
+chrono = "0.4"
 id3 = "1.17.2"
 rusqlite = { version = "0.32", features = ["bundled"] }
 walkdir = "2"
