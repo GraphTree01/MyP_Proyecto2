@@ -10,7 +10,16 @@ use crate::modelo::error::ErrorModelo;
 use crate::modelo::metadatos::Metadatos;
 use crate::modelo::rola::{Rola, Rolita};
 
-type DatosFila = (String, String, String, Option<String>, String);
+type DatosFila = (
+    String,
+    String,
+    String,
+    Option<String>,
+    String,
+    i64,
+    i64,
+    i64,
+);
 
 /// Acceso a datos de la tabla `rolas`.
 pub struct RolaDao;
@@ -75,6 +84,27 @@ impl RolaDao {
         Ok(conexion.last_insert_rowid())
     }
 
+    /// Actualiza los campos editables de una pista.
+    pub fn actualizar(
+        &self,
+        conexion: &Connection,
+        id_rola: i64,
+        titulo: &str,
+        id_performer: i64,
+        id_album: i64,
+    ) -> Result<bool, ErrorModelo> {
+        Ok(conexion.execute(
+            "UPDATE rolas SET title = ?1, id_performer = ?2, id_album = ?3
+             WHERE id_rola = ?4",
+            params![titulo, id_performer, id_album, id_rola],
+        )? > 0)
+    }
+
+    /// Elimina una pista identificada por su ID.
+    pub fn eliminar(&self, conexion: &Connection, id_rola: i64) -> Result<bool, ErrorModelo> {
+        Ok(conexion.execute("DELETE FROM rolas WHERE id_rola = ?1", [id_rola])? > 0)
+    }
+
     /// Devuelve la cantidad de canciones almacenadas.
     pub fn contar(&self, conexion: &Connection) -> Result<i64, ErrorModelo> {
         Ok(conexion.query_row("SELECT COUNT(*) FROM rolas", [], |fila| fila.get(0))?)
@@ -92,9 +122,9 @@ impl RolaDao {
         incluir: bool,
     ) -> Result<Vec<Rolita>, ErrorModelo> {
         let columnas = if incluir {
-            "NULL, r.path"
+            "NULL, r.path, r.id_rola, r.id_album, r.id_performer"
         } else {
-            "r.genre, r.path"
+            "r.genre, r.path, r.id_rola, r.id_album, r.id_performer"
         };
         let sql = format!(
             "SELECT r.title, p.name, a.name, {columnas}
@@ -144,20 +174,25 @@ impl RolaDao {
         filas
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
-            .map(|(titulo, performer, album, genero, ruta)| {
-                Ok(Rolita {
-                    path: ruta.clone().into(),
-                    titulo,
-                    performer,
-                    album,
-                    genero,
-                    caratula: if incluir {
-                        Metadatos::leer_caratula(Path::new(&ruta))?
-                    } else {
-                        None
-                    },
-                })
-            })
+            .map(
+                |(titulo, performer, album, genero, ruta, id_rola, id_album, id_performer)| {
+                    Ok(Rolita {
+                        id_rola,
+                        id_performer,
+                        id_album,
+                        path: ruta.clone().into(),
+                        titulo,
+                        performer,
+                        album,
+                        genero,
+                        caratula: if incluir {
+                            Metadatos::leer_caratula(Path::new(&ruta))?
+                        } else {
+                            None
+                        },
+                    })
+                },
+            )
             .collect()
     }
 }
@@ -169,6 +204,9 @@ fn fila_a_datos(fila: &rusqlite::Row<'_>) -> rusqlite::Result<DatosFila> {
         fila.get(2)?,
         fila.get(3)?,
         fila.get(4)?,
+        fila.get(5)?,
+        fila.get(6)?,
+        fila.get(7)?,
     ))
 }
 
@@ -201,5 +239,8 @@ mod tests {
 
         assert_eq!(resultados.len(), 1);
         assert_eq!(resultados[0].titulo, "Canción de amor");
+        assert_eq!(resultados[0].id_rola, 1);
+        assert_eq!(resultados[0].id_album, 1);
+        assert_eq!(resultados[0].id_performer, 1);
     }
 }

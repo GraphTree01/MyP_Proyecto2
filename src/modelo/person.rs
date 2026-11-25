@@ -1,4 +1,5 @@
 /// Representa un registro de la tabla `persons`, en la base de datos.
+#[derive(Clone, Debug)]
 pub struct Person {
     /// Identificador generado por SQLite.
     pub id_person: Option<i64>,

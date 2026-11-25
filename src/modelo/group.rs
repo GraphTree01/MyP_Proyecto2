@@ -1,4 +1,5 @@
 /// Representa un registro de la tabla `groups`, en la base de datos.
+#[derive(Clone, Debug)]
 pub struct Group {
     /// Identificador generado por SQLite.
     pub id_group: Option<i64>,

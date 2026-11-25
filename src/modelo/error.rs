@@ -11,6 +11,7 @@ pub enum ErrorModelo {
     ErrorCompilador(ErrorCompilador),
     RutaNoRepresentable(PathBuf),
     TituloNoDisponible(PathBuf),
+    Validacion(String),
 }
 
 /// Errores sintácticos o semánticos de una expresión de búsqueda.
@@ -50,6 +51,7 @@ impl fmt::Display for ErrorModelo {
                 "No se pudo determinar el título para '{}'",
                 ruta.display()
             ),
+            Self::Validacion(detalle) => write!(formatter, "{detalle}"),
         }
     }
 }
@@ -92,7 +94,9 @@ impl Error for ErrorModelo {
             Self::Recorrido(fuente) => Some(fuente),
             Self::LecturaId3 { fuente, .. } => Some(fuente),
             Self::ErrorCompilador(fuente) => Some(fuente),
-            Self::RutaNoRepresentable(_) | Self::TituloNoDisponible(_) => None,
+            Self::RutaNoRepresentable(_) | Self::TituloNoDisponible(_) | Self::Validacion(_) => {
+                None
+            }
         }
     }
 }

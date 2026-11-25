@@ -59,9 +59,9 @@ impl Compilador {
     fn compilar_raiz(raiz: &Nodo, incluir_ruta: bool) -> Result<ConsultaSql, ErrorCompilador> {
         let (condicion, parametros) = semantica::compilar(raiz)?;
         let columnas = if incluir_ruta {
-            ", NULL, r.path"
+            ", NULL, r.path, r.id_rola, r.id_album, r.id_performer"
         } else {
-            ", r.genre, r.path"
+            ", r.genre, r.path, r.id_rola, r.id_album, r.id_performer"
         };
 
         Ok(ConsultaSql {

@@ -23,6 +23,12 @@ pub struct Rola {
 /// Datos mínimos de una canción para mostrarlos en forma de tabla.
 #[derive(Clone)]
 pub struct Rolita {
+    /// Identificador de la pista.
+    pub id_rola: i64,
+    /// Identificador del intérprete.
+    pub id_performer: i64,
+    /// Identificador del álbum.
+    pub id_album: i64,
     /// Ruta de la pista.
     pub path: PathBuf,
     /// Título de la canción.

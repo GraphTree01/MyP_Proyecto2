@@ -67,4 +67,66 @@ impl AlbumDao {
         )?;
         Ok(conexion.last_insert_rowid())
     }
+
+    /// Busca los datos editables de un álbum.
+    pub fn buscar(
+        &self,
+        conexion: &Connection,
+        id_album: i64,
+    ) -> Result<Option<Album>, ErrorModelo> {
+        Ok(conexion
+            .query_row(
+                "SELECT id_album, path, name, year FROM albums WHERE id_album = ?1",
+                [id_album],
+                |fila| {
+                    let ruta: Option<String> = fila.get(1)?;
+                    Ok(Album {
+                        id_album: Some(fila.get(0)?),
+                        path: ruta.map(Into::into),
+                        name: fila.get(2)?,
+                        year: fila.get(3)?,
+                    })
+                },
+            )
+            .optional()?)
+    }
+
+    /// Actualiza el nombre y año del álbum sin modificar su ruta.
+    pub fn actualizar(
+        &self,
+        conexion: &Connection,
+        id_album: i64,
+        nombre: &str,
+        anio: Option<i32>,
+    ) -> Result<bool, ErrorModelo> {
+        if id_album == 0 {
+            return Err(ErrorModelo::Validacion(
+                "El álbum desconocido no se puede modificar.".to_owned(),
+            ));
+        }
+        Ok(conexion.execute(
+            "UPDATE albums SET name = ?1, year = ?2 WHERE id_album = ?3",
+            params![nombre, anio, id_album],
+        )? > 0)
+    }
+
+    /// Elimina un álbum si ninguna pista lo utiliza.
+    pub fn eliminar(&self, conexion: &Connection, id_album: i64) -> Result<bool, ErrorModelo> {
+        if id_album == 0 {
+            return Err(ErrorModelo::Validacion(
+                "El álbum desconocido no se puede eliminar.".to_owned(),
+            ));
+        }
+        let usado: bool = conexion.query_row(
+            "SELECT EXISTS(SELECT 1 FROM rolas WHERE id_album = ?1)",
+            [id_album],
+            |fila| fila.get(0),
+        )?;
+        if usado {
+            return Err(ErrorModelo::Validacion(
+                "No se puede eliminar el álbum mientras tenga canciones.".to_owned(),
+            ));
+        }
+        Ok(conexion.execute("DELETE FROM albums WHERE id_album = ?1", [id_album])? > 0)
+    }
 }
