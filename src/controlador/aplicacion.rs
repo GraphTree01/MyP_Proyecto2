@@ -26,6 +26,7 @@ impl Aplicacion {
         let minado = Rc::clone(&busqueda);
         self.vista.iniciar(
             rolas,
+            Rc::clone(&self.operaciones),
             move |directorio| minado.minar(&directorio).map_err(|error| error.to_string()),
             move |expresion, incluir_caratulas| {
                 busqueda
